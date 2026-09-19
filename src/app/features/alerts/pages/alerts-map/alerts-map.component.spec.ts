@@ -95,9 +95,9 @@ describe('AlertsMapComponent', () => {
     const reqPersonnel = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/users`);
     reqPersonnel.flush({ ok: true, users: [] });
 
-    // Alerts: loadAlerts({ limit: 100, page: 1 })
+    // Alerts: loadAlerts({ limit: 500, page: 1 })
     const reqAlerts = httpMock.expectOne(
-      (r) => r.url === `${environment.apiUrl}/alerts` && r.params.get('limit') === '100',
+      (r) => r.url === `${environment.apiUrl}/alerts` && r.params.get('limit') === '500',
     );
     reqAlerts.flush({
       ok: true,

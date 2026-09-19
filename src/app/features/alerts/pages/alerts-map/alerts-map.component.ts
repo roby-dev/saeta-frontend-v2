@@ -356,8 +356,8 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit(): void {
     this.alertsService.loadCatalogs();
-    // Load up to 100 alerts for map visualization
-    this.alertsService.loadAlerts({ limit: 100, page: 1 }).subscribe(() => {
+    // Load up to 500 alerts for comprehensive map visualization
+    this.alertsService.loadAlerts({ limit: 500, page: 1 }).subscribe(() => {
       this.updateMarkers();
     });
   }
