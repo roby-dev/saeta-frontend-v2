@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service.js';
 import type { Alert, AlertFilter, AlertStateSummary, AlertUserSummary } from '../../models/alert.model.js';
 import { AlertsService } from '../../services/alerts.service.js';
@@ -16,7 +17,12 @@ import { AlertsService } from '../../services/alerts.service.js';
       <!-- ============================================================== -->
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <!-- Total -->
-        <div class="bg-white p-4 rounded border border-[#e5edef] shadow-sm flex items-center justify-between">
+        <button
+          type="button"
+          (click)="resetFilters()"
+          class="bg-white p-4 rounded border border-[#e5edef] shadow-sm flex items-center justify-between text-left transition-all hover:border-blue-300 hover:shadow cursor-pointer"
+          [ngClass]="selectedStateId() === '' ? 'ring-2 ring-[#1976d2] border-transparent' : ''"
+        >
           <div>
             <span class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Alertas</span>
             <h3 class="text-2xl font-black text-[#2b354f] mt-1">{{ alertsService.total() }}</h3>
@@ -26,10 +32,15 @@ import { AlertsService } from '../../services/alerts.service.js';
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-        </div>
+        </button>
 
         <!-- Pendientes -->
-        <div class="bg-white p-4 rounded border border-[#e5edef] shadow-sm flex items-center justify-between">
+        <button
+          type="button"
+          (click)="setStateFilterDirect('pendiente')"
+          class="bg-white p-4 rounded border border-[#e5edef] shadow-sm flex items-center justify-between text-left transition-all hover:border-amber-300 hover:shadow cursor-pointer"
+          [ngClass]="isStateActive('pendiente') ? 'ring-2 ring-amber-500 border-transparent bg-amber-50/20' : ''"
+        >
           <div>
             <span class="text-xs text-amber-600 font-semibold uppercase tracking-wider">Pendientes</span>
             <h3 class="text-2xl font-black text-amber-600 mt-1">{{ alertsService.pendingCount() }}</h3>
@@ -39,10 +50,15 @@ import { AlertsService } from '../../services/alerts.service.js';
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-        </div>
+        </button>
 
         <!-- En Proceso -->
-        <div class="bg-white p-4 rounded border border-[#e5edef] shadow-sm flex items-center justify-between">
+        <button
+          type="button"
+          (click)="setStateFilterDirect('proceso')"
+          class="bg-white p-4 rounded border border-[#e5edef] shadow-sm flex items-center justify-between text-left transition-all hover:border-sky-300 hover:shadow cursor-pointer"
+          [ngClass]="isStateActive('proceso') ? 'ring-2 ring-sky-500 border-transparent bg-sky-50/20' : ''"
+        >
           <div>
             <span class="text-xs text-[#009efb] font-semibold uppercase tracking-wider">En Proceso</span>
             <h3 class="text-2xl font-black text-[#009efb] mt-1">{{ alertsService.processCount() }}</h3>
@@ -52,10 +68,15 @@ import { AlertsService } from '../../services/alerts.service.js';
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </div>
-        </div>
+        </button>
 
         <!-- Resueltas -->
-        <div class="bg-white p-4 rounded border border-[#e5edef] shadow-sm flex items-center justify-between">
+        <button
+          type="button"
+          (click)="setStateFilterDirect('resuelt')"
+          class="bg-white p-4 rounded border border-[#e5edef] shadow-sm flex items-center justify-between text-left transition-all hover:border-emerald-300 hover:shadow cursor-pointer"
+          [ngClass]="isStateActive('resuelt') ? 'ring-2 ring-emerald-500 border-transparent bg-emerald-50/20' : ''"
+        >
           <div>
             <span class="text-xs text-emerald-600 font-semibold uppercase tracking-wider">Resueltas</span>
             <h3 class="text-2xl font-black text-emerald-600 mt-1">{{ alertsService.resolvedCount() }}</h3>
@@ -65,10 +86,15 @@ import { AlertsService } from '../../services/alerts.service.js';
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-        </div>
+        </button>
 
         <!-- Canceladas -->
-        <div class="bg-white p-4 rounded border border-[#e5edef] shadow-sm flex items-center justify-between col-span-2 sm:col-span-1">
+        <button
+          type="button"
+          (click)="setStateFilterDirect('cancel')"
+          class="bg-white p-4 rounded border border-[#e5edef] shadow-sm flex items-center justify-between text-left col-span-2 sm:col-span-1 transition-all hover:border-rose-300 hover:shadow cursor-pointer"
+          [ngClass]="isStateActive('cancel') || isStateActive('rechaz') ? 'ring-2 ring-rose-500 border-transparent bg-rose-50/20' : ''"
+        >
           <div>
             <span class="text-xs text-rose-500 font-semibold uppercase tracking-wider">Canceladas</span>
             <h3 class="text-2xl font-black text-rose-500 mt-1">{{ alertsService.rejectedCount() }}</h3>
@@ -78,7 +104,7 @@ import { AlertsService } from '../../services/alerts.service.js';
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-        </div>
+        </button>
       </div>
 
       <!-- ============================================================== -->
@@ -106,8 +132,8 @@ import { AlertsService } from '../../services/alerts.service.js';
             <label class="block text-xs font-semibold text-slate-500 mb-1">Buscar por Ciudadano / DNI</label>
             <input
               type="text"
-              [(ngModel)]="searchQuery"
-              (input)="onSearchChange()"
+              [value]="searchQuery()"
+              (input)="onSearchInput($event)"
               placeholder="Nombre, apellido o DNI..."
               class="w-full text-xs px-3 py-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none"
             />
@@ -117,8 +143,8 @@ import { AlertsService } from '../../services/alerts.service.js';
           <div>
             <label class="block text-xs font-semibold text-slate-500 mb-1">Estado</label>
             <select
-              [(ngModel)]="selectedStateId"
-              (change)="applyFilters()"
+              [value]="selectedStateId()"
+              (change)="onStateChange($event)"
               class="w-full text-xs px-3 py-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white"
             >
               <option value="">Todos los estados</option>
@@ -132,8 +158,8 @@ import { AlertsService } from '../../services/alerts.service.js';
           <div>
             <label class="block text-xs font-semibold text-slate-500 mb-1">Tipo de Incidente</label>
             <select
-              [(ngModel)]="selectedTypeId"
-              (change)="applyFilters()"
+              [value]="selectedTypeId()"
+              (change)="onTypeChange($event)"
               class="w-full text-xs px-3 py-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white"
             >
               <option value="">Todos los tipos</option>
@@ -437,14 +463,15 @@ import { AlertsService } from '../../services/alerts.service.js';
 export class AlertsListComponent implements OnInit {
   protected readonly alertsService = inject(AlertsService);
   private readonly authService = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
 
   // Administrative check
   protected readonly isAdministrative = computed(() => this.authService.isAdministrative());
 
-  // Filter state
-  protected searchQuery = '';
-  protected selectedStateId = '';
-  protected selectedTypeId = '';
+  // Filter state signals
+  protected readonly searchQuery = signal<string>('');
+  protected readonly selectedStateId = signal<string>('');
+  protected readonly selectedTypeId = signal<string>('');
 
   // Managing modal state
   protected readonly managingAlert = signal<Alert | null>(null);
@@ -456,7 +483,7 @@ export class AlertsListComponent implements OnInit {
   // Client-side search filtering
   protected readonly filteredAlerts = computed(() => {
     const list = this.alertsService.alerts();
-    const q = this.searchQuery.trim().toLowerCase();
+    const q = this.searchQuery().trim().toLowerCase();
     if (!q) return list;
 
     return list.filter((a) => {
@@ -476,26 +503,93 @@ export class AlertsListComponent implements OnInit {
 
   ngOnInit(): void {
     this.alertsService.loadCatalogs();
-    this.alertsService.loadAlerts().subscribe();
+
+    const stateParam = this.route.snapshot.queryParamMap.get('state');
+    if (stateParam) {
+      this.handleInitialStateParam(stateParam);
+    } else {
+      this.alertsService.loadAlerts().subscribe();
+    }
   }
 
-  onSearchChange(): void {
-    // Reactive client filter triggered automatically via filteredAlerts signal
+  private handleInitialStateParam(stateParam: string): void {
+    const p = stateParam.toLowerCase();
+    const matchState = () => {
+      const states = this.alertsService.states();
+      const found = states.find((s) => {
+        const name = s.name.toLowerCase();
+        if (p.includes('resuelt')) return name.includes('resuelt');
+        if (p.includes('proceso')) return name.includes('proceso');
+        if (p.includes('pend')) return name.includes('pend');
+        if (p.includes('rechaz') || p.includes('cancel')) return name.includes('rechaz') || name.includes('cancel');
+        return false;
+      });
+      if (found) {
+        this.selectedStateId.set(found.id);
+        this.applyFilters();
+      } else {
+        this.alertsService.loadAlerts().subscribe();
+      }
+    };
+
+    if (this.alertsService.states().length > 0) {
+      matchState();
+    } else {
+      setTimeout(() => matchState(), 300);
+    }
+  }
+
+  onSearchInput(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    this.searchQuery.set(target.value);
+  }
+
+  onStateChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.selectedStateId.set(target.value);
+    this.applyFilters();
+  }
+
+  onTypeChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    this.selectedTypeId.set(target.value);
+    this.applyFilters();
+  }
+
+  setStateFilterDirect(stateKeyword: string): void {
+    const states = this.alertsService.states();
+    const found = states.find((s) => s.name.toLowerCase().includes(stateKeyword.toLowerCase()));
+    if (found) {
+      if (this.selectedStateId() === found.id) {
+        this.selectedStateId.set('');
+      } else {
+        this.selectedStateId.set(found.id);
+      }
+      this.applyFilters();
+    }
+  }
+
+  isStateActive(stateKeyword: string): boolean {
+    const currentId = this.selectedStateId();
+    if (!currentId) return false;
+    const states = this.alertsService.states();
+    const found = states.find((s) => s.id === currentId);
+    return found ? found.name.toLowerCase().includes(stateKeyword.toLowerCase()) : false;
   }
 
   applyFilters(): void {
     const filters: AlertFilter = {
-      stateId: this.selectedStateId || undefined,
-      typeId: this.selectedTypeId || undefined,
+      stateId: this.selectedStateId() || undefined,
+      typeId: this.selectedTypeId() || undefined,
       page: 1,
     };
     this.alertsService.loadAlerts(filters).subscribe();
   }
 
   resetFilters(): void {
-    this.searchQuery = '';
-    this.selectedStateId = '';
-    this.selectedTypeId = '';
+    this.searchQuery.set('');
+    this.selectedStateId.set('');
+    this.selectedTypeId.set('');
     this.alertsService.loadAlerts({ page: 1 }).subscribe();
   }
 
