@@ -3,12 +3,27 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { environment } from '../../../../environments/environment.js';
-import type { CreateUserPayload, UpdateUserPayload, User } from '../../../core/models/user.model.js';
+import type {
+  CreateUserPayload,
+  UpdateUserPayload,
+  User,
+  UserCountsSummary,
+} from '../../../core/models/user.model.js';
 import { UsersService } from './users.service.js';
 
 describe('UsersService', () => {
   let service: UsersService;
   let httpMock: HttpTestingController;
+
+  const mockCounts: UserCountsSummary = {
+    total: 4,
+    admin: 1,
+    baseSecurity: 1,
+    securityPersonnel: 1,
+    citizen: 1,
+    enabled: 3,
+    disabled: 1,
+  };
 
   const mockUsers: User[] = [
     {
@@ -79,14 +94,25 @@ describe('UsersService', () => {
     expect(service.disabledCount()).toBe(0);
   });
 
-  it('loads all users and calculates role counts and filtered results', () => {
+  it('loads paginated users and sets server aggregation counts', () => {
     service.loadUsers().subscribe();
 
     expect(service.loading()).toBe(true);
 
-    const req = httpMock.expectOne(`${environment.apiUrl}/users/all`);
+    const req = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/users`);
     expect(req.request.method).toBe('GET');
-    req.flush({ ok: true, users: mockUsers });
+    expect(req.request.params.get('page')).toBe('1');
+    expect(req.request.params.get('limit')).toBe('10');
+
+    req.flush({
+      ok: true,
+      users: mockUsers,
+      total: 4,
+      page: 1,
+      limit: 10,
+      totalPages: 1,
+      counts: mockCounts,
+    });
 
     expect(service.loading()).toBe(false);
     expect(service.users().length).toBe(4);
@@ -99,36 +125,50 @@ describe('UsersService', () => {
     expect(service.disabledCount()).toBe(1);
   });
 
-  it('filters users by role tab', () => {
-    service.users.set(mockUsers);
-
+  it('filters users by role tab and sends query parameter', () => {
     service.setRoleTab('PERSONAL_SEGURIDAD');
-    expect(service.filteredUsers().length).toBe(1);
-    expect(service.filteredUsers()[0].name).toBe('Juan');
+    expect(service.selectedRoleTab()).toBe('PERSONAL_SEGURIDAD');
 
-    service.setRoleTab('TODOS');
-    expect(service.filteredUsers().length).toBe(4);
+    const req = httpMock.expectOne(
+      (r) => r.url === `${environment.apiUrl}/users` && r.params.get('role') === 'PERSONAL_SEGURIDAD',
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      ok: true,
+      users: [mockUsers[2]],
+      total: 1,
+      page: 1,
+      limit: 10,
+      totalPages: 1,
+      counts: mockCounts,
+    });
+
+    expect(service.users().length).toBe(1);
+    expect(service.users()[0].name).toBe('Juan');
   });
 
-  it('filters users by search query across name, DNI, phone or email', () => {
-    service.users.set(mockUsers);
+  it('filters users by status account', () => {
+    service.setStatusFilter('INHABILITADO');
+    expect(service.selectedStatusFilter()).toBe('INHABILITADO');
 
-    service.setSearchQuery('gomez');
-    expect(service.filteredUsers().length).toBe(1);
-    expect(service.filteredUsers()[0].name).toBe('Maria');
+    const req = httpMock.expectOne(
+      (r) => r.url === `${environment.apiUrl}/users` && r.params.get('statusAccount') === 'INHABILITADO',
+    );
+    req.flush({
+      ok: true,
+      users: [mockUsers[3]],
+      total: 1,
+      page: 1,
+      limit: 10,
+      totalPages: 1,
+      counts: mockCounts,
+    });
 
-    service.setSearchQuery('11223344');
-    expect(service.filteredUsers().length).toBe(1);
-    expect(service.filteredUsers()[0].name).toBe('Juan');
-
-    service.setSearchQuery('944332211');
-    expect(service.filteredUsers().length).toBe(1);
-    expect(service.filteredUsers()[0].name).toBe('Ana');
+    expect(service.users().length).toBe(1);
+    expect(service.users()[0].name).toBe('Ana');
   });
 
-  it('creates user and updates signals', () => {
-    service.users.set(mockUsers);
-
+  it('creates user, posts payload and triggers data reload', () => {
     const newUserPayload: CreateUserPayload = {
       name: 'Pedro',
       lastname: 'Alvarez',
@@ -155,17 +195,22 @@ describe('UsersService', () => {
       expect(res.user.id).toBe('u-5');
     });
 
-    const req = httpMock.expectOne(`${environment.apiUrl}/users`);
-    expect(req.request.method).toBe('POST');
-    req.flush({ ok: true, user: createdUser });
+    const reqPost = httpMock.expectOne(`${environment.apiUrl}/users`);
+    expect(reqPost.request.method).toBe('POST');
+    reqPost.flush({ ok: true, user: createdUser });
 
-    expect(service.users().length).toBe(5);
-    expect(service.users()[0].name).toBe('Pedro');
+    // Reload triggers
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/users`);
+    expect(reqReload.request.method).toBe('GET');
+    reqReload.flush({
+      ok: true,
+      users: [createdUser, ...mockUsers],
+      total: 5,
+      counts: { ...mockCounts, total: 5, baseSecurity: 2 },
+    });
   });
 
-  it('updates user and reflects changes in signals', () => {
-    service.users.set(mockUsers);
-
+  it('updates user and triggers reload', () => {
     const updatePayload: UpdateUserPayload = {
       name: 'Carlos Alberto',
     };
@@ -181,13 +226,11 @@ describe('UsersService', () => {
       user: { ...mockUsers[0], name: 'Carlos Alberto' },
     });
 
-    const updated = service.users().find((u) => u.id === 'u-1');
-    expect(updated?.name).toBe('Carlos Alberto');
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/users`);
+    reqReload.flush({ ok: true, users: mockUsers, total: 4 });
   });
 
-  it('toggles user status from HABILITADO to INHABILITADO and vice versa', () => {
-    service.users.set(mockUsers);
-
+  it('toggles user status from HABILITADO to INHABILITADO', () => {
     service.toggleUserStatus(mockUsers[0]).subscribe();
 
     const req = httpMock.expectOne(`${environment.apiUrl}/users/u-1`);
@@ -198,8 +241,8 @@ describe('UsersService', () => {
       user: { ...mockUsers[0], statusAccount: 'INHABILITADO' },
     });
 
-    const found = service.users().find((u) => u.id === 'u-1');
-    expect(found?.statusAccount).toBe('INHABILITADO');
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/users`);
+    reqReload.flush({ ok: true, users: mockUsers, total: 4 });
   });
 
   it('changes user password', () => {

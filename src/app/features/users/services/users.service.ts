@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { Observable, tap } from 'rxjs';
+import { debounceTime, distinctUntilChanged, Observable, Subject, tap } from 'rxjs';
 import { environment } from '../../../../environments/environment.js';
 import type {
   AccountStatus,
@@ -8,7 +8,7 @@ import type {
   GetUsersResponse,
   UpdateUserPayload,
   User,
-  UserRole,
+  UserCountsSummary,
 } from '../../../core/models/user.model.js';
 
 @Injectable({
@@ -18,11 +18,20 @@ export class UsersService {
   private readonly http = inject(HttpClient);
   private readonly API_URL = `${environment.apiUrl}/users`;
 
-  // Signals
+  // Server state signals
   readonly users = signal<User[]>([]);
   readonly loading = signal<boolean>(false);
   readonly total = signal<number>(0);
   readonly selectedUser = signal<User | null>(null);
+  readonly counts = signal<UserCountsSummary>({
+    total: 0,
+    admin: 0,
+    baseSecurity: 0,
+    securityPersonnel: 0,
+    citizen: 0,
+    enabled: 0,
+    disabled: 0,
+  });
 
   // Filter & Pagination Signals
   readonly selectedRoleTab = signal<string>('TODOS');
@@ -31,87 +40,73 @@ export class UsersService {
   readonly currentPage = signal<number>(1);
   readonly pageSize = signal<number>(10);
 
-  // Computed counters by role
-  readonly adminCount = computed(() => {
-    return this.users().filter((u) => u.role === 'ADMIN').length;
-  });
+  // Search debounce subject
+  private readonly searchSubject = new Subject<string>();
 
-  readonly baseCount = computed(() => {
-    return this.users().filter((u) => u.role === 'BASE_SEGURIDAD').length;
-  });
-
-  readonly personalCount = computed(() => {
-    return this.users().filter((u) => u.role === 'PERSONAL_SEGURIDAD').length;
-  });
-
-  readonly citizenCount = computed(() => {
-    return this.users().filter((u) => u.role === 'CIUDADANO').length;
-  });
-
-  readonly totalCount = computed(() => this.users().length);
-
-  readonly enabledCount = computed(() => {
-    return this.users().filter((u) => (u.statusAccount ?? 'HABILITADO') === 'HABILITADO').length;
-  });
-
-  readonly disabledCount = computed(() => {
-    return this.users().filter((u) => u.statusAccount === 'INHABILITADO').length;
-  });
-
-  // Computed list filtered by role tab, status, and search query
-  readonly filteredUsers = computed(() => {
-    let list = this.users();
-    const roleTab = this.selectedRoleTab();
-    const statusFilter = this.selectedStatusFilter();
-    const query = this.searchQuery().trim().toLowerCase();
-
-    if (roleTab !== 'TODOS') {
-      list = list.filter((u) => u.role === roleTab);
-    }
-
-    if (statusFilter) {
-      list = list.filter((u) => (u.statusAccount ?? 'HABILITADO') === statusFilter);
-    }
-
-    if (query) {
-      list = list.filter((u) => {
-        const fullName = `${u.name ?? ''} ${u.lastname ?? ''}`.toLowerCase();
-        const dni = u.dni?.toLowerCase() ?? '';
-        const phone = u.phone?.toLowerCase() ?? '';
-        const email = u.email?.toLowerCase() ?? '';
-        return fullName.includes(query) || dni.includes(query) || phone.includes(query) || email.includes(query);
+  constructor() {
+    this.searchSubject
+      .pipe(debounceTime(300), distinctUntilChanged())
+      .subscribe(() => {
+        this.loadUsers().subscribe();
       });
-    }
+  }
 
-    return list;
-  });
+  // Counters derived directly from server aggregation
+  readonly adminCount = computed(() => this.counts().admin);
+  readonly baseCount = computed(() => this.counts().baseSecurity);
+  readonly personalCount = computed(() => this.counts().securityPersonnel);
+  readonly citizenCount = computed(() => this.counts().citizen);
+  readonly totalCount = computed(() => this.counts().total);
+  readonly enabledCount = computed(() => this.counts().enabled);
+  readonly disabledCount = computed(() => this.counts().disabled);
 
-  readonly filteredTotal = computed(() => this.filteredUsers().length);
+  // Total matching current filter (for pagination text, e.g. "Mostrando X de Y usuarios")
+  readonly filteredTotal = computed(() => this.total());
 
   readonly totalPages = computed(() => {
-    const total = this.filteredTotal();
+    const total = this.total();
     const size = this.pageSize();
     return Math.max(1, Math.ceil(total / size));
   });
 
-  // Paginated slice for current page
-  readonly paginatedUsers = computed(() => {
-    const list = this.filteredUsers();
-    const page = this.currentPage();
-    const size = this.pageSize();
-    const start = (page - 1) * size;
-    return list.slice(start, start + size);
-  });
+  // Paginated users slice returned by server
+  readonly paginatedUsers = computed(() => this.users());
+  readonly filteredUsers = computed(() => this.users());
 
-  loadUsers(): Observable<{ ok: boolean; users: User[] }> {
+  loadUsers(page?: number): Observable<GetUsersResponse> {
     this.loading.set(true);
 
-    return this.http.get<{ ok: boolean; users: User[] }>(`${this.API_URL}/all`).pipe(
+    const targetPage = page ?? this.currentPage();
+    let params = new HttpParams()
+      .set('page', String(targetPage))
+      .set('limit', String(this.pageSize()));
+
+    const roleTab = this.selectedRoleTab();
+    if (roleTab && roleTab !== 'TODOS') {
+      params = params.set('role', roleTab);
+    }
+
+    const statusFilter = this.selectedStatusFilter();
+    if (statusFilter) {
+      params = params.set('statusAccount', statusFilter);
+    }
+
+    const query = this.searchQuery().trim();
+    if (query) {
+      params = params.set('search', query);
+    }
+
+    return this.http.get<GetUsersResponse>(this.API_URL, { params }).pipe(
       tap({
         next: (res) => {
-          const list = res.users ?? [];
-          this.users.set(list);
-          this.total.set(list.length);
+          this.users.set(res.users ?? []);
+          this.total.set(res.total ?? 0);
+          if (page) {
+            this.currentPage.set(page);
+          }
+          if (res.counts) {
+            this.counts.set(res.counts);
+          }
           this.loading.set(false);
         },
         error: () => {
@@ -125,8 +120,7 @@ export class UsersService {
     return this.http.post<{ ok: boolean; user: User }>(this.API_URL, payload).pipe(
       tap((res) => {
         if (res.ok && res.user) {
-          this.users.update((list) => [res.user, ...list]);
-          this.total.update((t) => t + 1);
+          this.loadUsers().subscribe();
         }
       }),
     );
@@ -142,6 +136,7 @@ export class UsersService {
           if (this.selectedUser()?.id === id) {
             this.selectedUser.set({ ...this.selectedUser()!, ...res.user });
           }
+          this.loadUsers().subscribe();
         }
       }),
     );
@@ -161,24 +156,34 @@ export class UsersService {
   }
 
   setRoleTab(role: string): void {
-    this.selectedRoleTab.set(role);
-    this.currentPage.set(1);
+    if (this.selectedRoleTab() !== role) {
+      this.selectedRoleTab.set(role);
+      this.currentPage.set(1);
+      this.loadUsers(1).subscribe();
+    }
   }
 
   setStatusFilter(status: string): void {
-    this.selectedStatusFilter.set(status);
-    this.currentPage.set(1);
+    if (this.selectedStatusFilter() !== status) {
+      this.selectedStatusFilter.set(status);
+      this.currentPage.set(1);
+      this.loadUsers(1).subscribe();
+    }
   }
 
   setSearchQuery(query: string): void {
     this.searchQuery.set(query);
     this.currentPage.set(1);
+    this.searchSubject.next(query);
   }
 
   setPage(page: number): void {
     const max = this.totalPages();
     const target = Math.max(1, Math.min(page, max));
-    this.currentPage.set(target);
+    if (this.currentPage() !== target) {
+      this.currentPage.set(target);
+      this.loadUsers(target).subscribe();
+    }
   }
 
   nextPage(): void {

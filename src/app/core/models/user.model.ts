@@ -50,6 +50,16 @@ export interface UpdateUserPayload {
   emergencyContacts?: EmergencyContact[];
 }
 
+export interface UserCountsSummary {
+  total: number;
+  admin: number;
+  baseSecurity: number;
+  securityPersonnel: number;
+  citizen: number;
+  enabled: number;
+  disabled: number;
+}
+
 export interface GetUsersResponse {
   ok: boolean;
   users: User[];
@@ -57,7 +67,9 @@ export interface GetUsersResponse {
   page: number;
   limit: number;
   totalPages: number;
+  counts?: UserCountsSummary;
 }
+
 
 export interface AuthResponse {
   accessToken: string;
