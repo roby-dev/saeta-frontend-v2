@@ -18,6 +18,7 @@ RUN pnpm run build
 FROM nginx:alpine AS runtime
 
 ENV PORT=80
+ENV NGINX_ENVSUBST_FILTER="PORT"
 
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist/saeta-frontend-v2/browser /usr/share/nginx/html
