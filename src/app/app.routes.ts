@@ -42,6 +42,20 @@ export const routes: Routes = [
           ).then((m) => m.OverviewComponent),
       },
       {
+        path: 'alerts',
+        loadComponent: () =>
+          import(
+            './features/alerts/pages/alerts-list/alerts-list.component.js'
+          ).then((m) => m.AlertsListComponent),
+      },
+      {
+        path: 'alerts/map',
+        loadComponent: () =>
+          import(
+            './features/alerts/pages/alerts-map/alerts-map.component.js'
+          ).then((m) => m.AlertsMapComponent),
+      },
+      {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full',
