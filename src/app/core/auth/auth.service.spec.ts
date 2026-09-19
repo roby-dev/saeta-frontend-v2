@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { environment } from '../../../environments/environment.js';
 import { AuthService } from './auth.service.js';
 
 describe('AuthService', () => {
@@ -54,7 +55,7 @@ describe('AuthService', () => {
       expect(res.ok).toBe(true);
     });
 
-    const req = httpMock.expectOne('http://localhost:3000/v1/auth/login');
+    const req = httpMock.expectOne(`${environment.apiUrl}/auth/login`);
     expect(req.request.method).toBe('POST');
     req.flush(mockResponse);
 

@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
+import { environment } from '../../../environments/environment.js';
 import type { AuthResponse, User } from '../models/user.model.js';
 
 @Injectable({
@@ -11,7 +12,7 @@ export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
 
-  private readonly API_URL = 'http://localhost:3000/v1/auth';
+  private readonly API_URL = `${environment.apiUrl}/auth`;
 
   // Signals
   readonly currentUser = signal<User | null>(this.loadStoredUser());
