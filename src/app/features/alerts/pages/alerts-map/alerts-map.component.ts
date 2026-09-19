@@ -51,8 +51,8 @@ interface DistrictOption {
               Distrito (Tacna)
             </label>
             <select
-              [(ngModel)]="selectedDistrictId"
-              (change)="onDistrictChange()"
+              [value]="selectedDistrictId()"
+              (change)="onDistrictChange($event)"
               class="w-full text-xs p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white"
             >
               <option value="">Todos los distritos</option>
@@ -68,8 +68,8 @@ interface DistrictOption {
               Por Estado
             </label>
             <select
-              [(ngModel)]="selectedStateFilter"
-              (change)="onStateFilterChange()"
+              [value]="selectedStateFilter()"
+              (change)="onStateFilterChange($event)"
               class="w-full text-xs p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white"
             >
               <option value="all">Todas las alertas</option>
@@ -79,6 +79,7 @@ interface DistrictOption {
               <option value="rechazada">Canceladas / Rechazadas</option>
             </select>
           </div>
+
 
           <!-- Reset Filter -->
           <button
@@ -113,38 +114,72 @@ interface DistrictOption {
 
         <!-- Alert Status Legend Card -->
         <div class="bg-white p-4 rounded border border-[#e5edef] shadow-sm space-y-2">
-          <h4 class="card-title text-sm font-bold text-[#455a64] flex items-center">
-            <span class="lstick"></span>Estado de Emergencias
-          </h4>
-          <div class="text-xs space-y-2">
-            <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between">
+            <h4 class="card-title text-sm font-bold text-[#455a64] flex items-center">
+              <span class="lstick"></span>Estado de Emergencias
+            </h4>
+            @if (selectedStateFilter() !== 'all') {
+              <button
+                type="button"
+                (click)="setStateFilter('all')"
+                class="text-[11px] text-blue-600 hover:underline font-semibold"
+              >
+                Ver todas
+              </button>
+            }
+          </div>
+          <div class="text-xs space-y-1.5">
+            <button
+              type="button"
+              (click)="setStateFilter(selectedStateFilter() === 'pendiente' ? 'all' : 'pendiente')"
+              class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
+              [ngClass]="selectedStateFilter() === 'pendiente' ? 'bg-amber-50 border border-amber-200' : 'hover:bg-slate-50'"
+            >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-amber-500"></span>
-                <span>Pendientes</span>
+                <span class="font-medium text-slate-700">Pendientes</span>
               </div>
               <span class="font-bold text-amber-600">{{ alertsService.pendingCount() }}</span>
-            </div>
-            <div class="flex items-center justify-between">
+            </button>
+
+            <button
+              type="button"
+              (click)="setStateFilter(selectedStateFilter() === 'proceso' ? 'all' : 'proceso')"
+              class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
+              [ngClass]="selectedStateFilter() === 'proceso' ? 'bg-sky-50 border border-sky-200' : 'hover:bg-slate-50'"
+            >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-[#009efb]"></span>
-                <span>En Proceso</span>
+                <span class="font-medium text-slate-700">En Proceso</span>
               </div>
               <span class="font-bold text-[#009efb]">{{ alertsService.processCount() }}</span>
-            </div>
-            <div class="flex items-center justify-between">
+            </button>
+
+            <button
+              type="button"
+              (click)="setStateFilter(selectedStateFilter() === 'resuelta' ? 'all' : 'resuelta')"
+              class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
+              [ngClass]="selectedStateFilter() === 'resuelta' ? 'bg-emerald-50 border border-emerald-200' : 'hover:bg-slate-50'"
+            >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
-                <span>Resueltas</span>
+                <span class="font-medium text-slate-700">Resueltas</span>
               </div>
               <span class="font-bold text-emerald-600">{{ alertsService.resolvedCount() }}</span>
-            </div>
-            <div class="flex items-center justify-between">
+            </button>
+
+            <button
+              type="button"
+              (click)="setStateFilter(selectedStateFilter() === 'rechazada' ? 'all' : 'rechazada')"
+              class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
+              [ngClass]="selectedStateFilter() === 'rechazada' ? 'bg-rose-50 border border-rose-200' : 'hover:bg-slate-50'"
+            >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-rose-500"></span>
-                <span>Canceladas</span>
+                <span class="font-medium text-slate-700">Canceladas</span>
               </div>
               <span class="font-bold text-rose-500">{{ alertsService.rejectedCount() }}</span>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -170,7 +205,7 @@ interface DistrictOption {
               <div class="flex items-center gap-2">
                 <span
                   class="w-3 h-3 rounded-full"
-                  [ngClass]="getDotClass(selectedAlert()!.state?.name)"
+                  [ngClass]="getDotClass(getAlertStateName(selectedAlert()!))"
                 ></span>
                 <span class="font-bold text-xs text-slate-800">
                   Alerta #{{ selectedAlert()!.id.slice(-6).toUpperCase() }}
@@ -201,6 +236,17 @@ interface DistrictOption {
               <p>
                 <b class="text-slate-700">Incidente:</b>
                 {{ selectedAlert()!.type?.name || 'Emergencia' }}
+              </p>
+              <p>
+                <b class="text-slate-700">Estado:</b>
+                <span class="font-semibold ml-1" [ngClass]="{
+                  'text-amber-600': getAlertStateName(selectedAlert()!).toLowerCase().includes('pendiente'),
+                  'text-[#009efb]': getAlertStateName(selectedAlert()!).toLowerCase().includes('proceso'),
+                  'text-emerald-600': getAlertStateName(selectedAlert()!).toLowerCase().includes('resuelt'),
+                  'text-rose-500': getAlertStateName(selectedAlert()!).toLowerCase().includes('rechazad') || getAlertStateName(selectedAlert()!).toLowerCase().includes('cancelad')
+                }">
+                  {{ getAlertStateName(selectedAlert()!) }}
+                </span>
               </p>
               <p>
                 <b class="text-slate-700">Fecha:</b>
@@ -261,8 +307,8 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     { id: 'pocollay', name: 'Pocollay', lat: -18.0069, lng: -70.2241 },
   ];
 
-  protected selectedDistrictId = '';
-  protected selectedStateFilter = 'all';
+  protected readonly selectedDistrictId = signal<string>('');
+  protected readonly selectedStateFilter = signal<string>('all');
   protected readonly selectedAlert = signal<Alert | null>(null);
 
   // Personnel counters
@@ -287,16 +333,23 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   // Filtered alerts for map display
   protected readonly displayedAlerts = computed(() => {
     const list = this.alertsService.alerts();
-    const filter = this.selectedStateFilter;
+    const filter = this.selectedStateFilter().toLowerCase();
 
     if (filter === 'all') return list;
 
     return list.filter((a) => {
-      const s = a.state?.name?.toLowerCase() ?? '';
-      if (filter === 'pendiente') return s.includes('pendiente');
-      if (filter === 'proceso') return s.includes('proceso');
-      if (filter === 'resuelta') return s.includes('resuelta') || s.includes('resuelto');
-      if (filter === 'rechazada') return s.includes('rechazada') || s.includes('cancelada');
+      let stateName = a.state?.name?.toLowerCase() ?? '';
+      if (!stateName && a.stateId) {
+        const matched = this.alertsService.states().find((s) => s.id === a.stateId);
+        if (matched) {
+          stateName = matched.name.toLowerCase();
+        }
+      }
+
+      if (filter === 'pendiente') return stateName.includes('pendiente');
+      if (filter === 'proceso') return stateName.includes('proceso');
+      if (filter === 'resuelta') return stateName.includes('resuelt');
+      if (filter === 'rechazada') return stateName.includes('rechazad') || stateName.includes('cancelad');
       return true;
     });
   });
@@ -346,7 +399,8 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     for (const alert of alerts) {
       if (!alert.latitude || !alert.longitude) continue;
 
-      const color = this.getMarkerColor(alert.state?.name);
+      const stateName = this.getAlertStateName(alert);
+      const color = this.getMarkerColor(stateName);
       const icon = L.divIcon({
         className: 'custom-map-pin',
         html: `
@@ -375,7 +429,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
       });
 
       marker.bindTooltip(
-        `<b>#${alert.id.slice(-6).toUpperCase()}</b> - ${alert.type?.name || 'Alerta'} (${alert.state?.name || 'Estado'})`,
+        `<b>#${alert.id.slice(-6).toUpperCase()}</b> - ${alert.type?.name || 'Alerta'} (${stateName})`,
         { direction: 'top', offset: [0, -10] },
       );
 
@@ -383,9 +437,12 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  onDistrictChange(): void {
+  onDistrictChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    const value = target?.value ?? '';
+    this.selectedDistrictId.set(value);
     if (!this.map) return;
-    const dist = this.districts.find((d) => d.id === this.selectedDistrictId);
+    const dist = this.districts.find((d) => d.id === value);
     if (dist) {
       this.map.flyTo([dist.lat, dist.lng], 14, { duration: 1.2 });
     } else {
@@ -393,13 +450,20 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  onStateFilterChange(): void {
+  onStateFilterChange(event: Event): void {
+    const target = event.target as HTMLSelectElement;
+    const value = target?.value ?? 'all';
+    this.setStateFilter(value);
+  }
+
+  setStateFilter(filter: string): void {
+    this.selectedStateFilter.set(filter);
     this.updateMarkers();
   }
 
   resetMapFilters(): void {
-    this.selectedDistrictId = '';
-    this.selectedStateFilter = 'all';
+    this.selectedDistrictId.set('');
+    this.selectedStateFilter.set('all');
     this.selectedAlert.set(null);
     if (this.map) {
       this.map.flyTo(this.TACNA_CENTER, 13, { duration: 1.2 });
@@ -413,12 +477,21 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  protected getAlertStateName(alert: Alert): string {
+    if (alert.state?.name) return alert.state.name;
+    if (alert.stateId) {
+      const matched = this.alertsService.states().find((s) => s.id === alert.stateId);
+      if (matched) return matched.name;
+    }
+    return 'Sin estado';
+  }
+
   private getMarkerColor(stateName?: string): string {
     const s = stateName?.toLowerCase() ?? '';
     if (s.includes('pendiente')) return '#ffb22b';
     if (s.includes('proceso')) return '#009efb';
-    if (s.includes('resuelta') || s.includes('resuelto')) return '#26c6da';
-    if (s.includes('rechazada') || s.includes('cancelada')) return '#ef5350';
+    if (s.includes('resuelt')) return '#26c6da';
+    if (s.includes('rechazad') || s.includes('cancelad')) return '#ef5350';
     return '#745af2';
   }
 
@@ -426,8 +499,8 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     const s = stateName?.toLowerCase() ?? '';
     if (s.includes('pendiente')) return 'bg-amber-500';
     if (s.includes('proceso')) return 'bg-sky-500';
-    if (s.includes('resuelta') || s.includes('resuelto')) return 'bg-emerald-500';
-    if (s.includes('rechazada') || s.includes('cancelada')) return 'bg-rose-500';
+    if (s.includes('resuelt')) return 'bg-emerald-500';
+    if (s.includes('rechazad') || s.includes('cancelad')) return 'bg-rose-500';
     return 'bg-slate-400';
   }
 }
