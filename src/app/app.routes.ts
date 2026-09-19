@@ -63,6 +63,13 @@ export const routes: Routes = [
           ).then((m) => m.UsersListComponent),
       },
       {
+        path: 'profile',
+        loadComponent: () =>
+          import(
+            './features/profile/pages/profile-page/profile-page.component.js'
+          ).then((m) => m.ProfilePageComponent),
+      },
+      {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full',
