@@ -56,6 +56,13 @@ export const routes: Routes = [
           ).then((m) => m.AlertsMapComponent),
       },
       {
+        path: 'users',
+        loadComponent: () =>
+          import(
+            './features/users/pages/users-list/users-list.component.js'
+          ).then((m) => m.UsersListComponent),
+      },
+      {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full',
