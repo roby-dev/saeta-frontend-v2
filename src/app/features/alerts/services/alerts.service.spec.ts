@@ -66,6 +66,7 @@ describe('AlertsService', () => {
     expect(service.pendingCount()).toBe(0);
     expect(service.processCount()).toBe(0);
     expect(service.resolvedCount()).toBe(0);
+    expect(service.rejectedCount()).toBe(0);
   });
 
   it('loads catalogs (states, types, users)', () => {
@@ -95,7 +96,7 @@ describe('AlertsService', () => {
     expect(service.personnel()[0].name).toBe('Oficial');
   });
 
-  it('loads alerts with pagination and calculates state counts', () => {
+  it('loads alerts with pagination and sets server state counts', () => {
     service.loadAlerts({ page: 1, limit: 10 }).subscribe();
 
     expect(service.loading()).toBe(true);
@@ -104,7 +105,20 @@ describe('AlertsService', () => {
       (r) => r.url === `${environment.apiUrl}/alerts` && r.params.get('page') === '1',
     );
     expect(req.request.method).toBe('GET');
-    req.flush({ ok: true, alerts: mockAlerts, total: 3, page: 1, limit: 10 });
+    req.flush({
+      ok: true,
+      alerts: mockAlerts,
+      total: 3,
+      page: 1,
+      limit: 10,
+      stateCounts: {
+        pending: 1,
+        inProcess: 1,
+        resolved: 1,
+        rejected: 0,
+        total: 3,
+      },
+    });
 
     expect(service.loading()).toBe(false);
     expect(service.alerts().length).toBe(3);
@@ -115,7 +129,7 @@ describe('AlertsService', () => {
     expect(service.rejectedCount()).toBe(0);
   });
 
-  it('updates alert state and reflects in signals', () => {
+  it('updates alert state, reflects in signals, and triggers reload', () => {
     service.alerts.set(mockAlerts);
 
     const updatedAlert: Alert = {
@@ -128,11 +142,21 @@ describe('AlertsService', () => {
       expect(res.ok).toBe(true);
     });
 
-    const req = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1`);
-    expect(req.request.method).toBe('PUT');
-    req.flush({ ok: true, alerts: updatedAlert });
+    const reqPut = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1`);
+    expect(reqPut.request.method).toBe('PUT');
+    reqPut.flush({ ok: true, alerts: updatedAlert });
+
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    expect(reqReload.request.method).toBe('GET');
+    reqReload.flush({
+      ok: true,
+      alerts: [updatedAlert, mockAlerts[1], mockAlerts[2]],
+      total: 3,
+      stateCounts: { pending: 0, inProcess: 2, resolved: 1, rejected: 0, total: 3 },
+    });
 
     const found = service.alerts().find((a) => a.id === 'alert-1');
     expect(found?.state?.name).toBe('En proceso');
+    expect(service.processCount()).toBe(2);
   });
 });

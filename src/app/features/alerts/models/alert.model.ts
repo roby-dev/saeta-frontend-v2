@@ -55,10 +55,20 @@ export interface AlertFilter {
   dateRange?: 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all';
 }
 
+export interface AlertStateCounts {
+  pending: number;
+  inProcess: number;
+  resolved: number;
+  rejected: number;
+  total: number;
+}
+
 export interface AlertsResponse {
   ok: boolean;
   alerts: Alert[];
   total: number;
   page?: number;
   limit?: number;
+  stateCounts?: AlertStateCounts;
 }
+

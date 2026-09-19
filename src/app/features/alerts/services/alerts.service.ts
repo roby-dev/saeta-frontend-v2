@@ -6,6 +6,7 @@ import type {
   Alert,
   AlertFilter,
   AlertsResponse,
+  AlertStateCounts,
   AlertStateSummary,
   AlertTypeSummary,
   AlertUserSummary,
@@ -27,39 +28,26 @@ export class AlertsService {
   readonly personnel = signal<AlertUserSummary[]>([]);
   readonly selectedAlert = signal<Alert | null>(null);
 
+  // Server state counts signal
+  readonly stateCounts = signal<AlertStateCounts>({
+    pending: 0,
+    inProcess: 0,
+    resolved: 0,
+    rejected: 0,
+    total: 0,
+  });
+
   // Pagination & Filter Signals
   readonly currentPage = signal<number>(1);
   readonly pageSize = signal<number>(10);
   readonly activeFilters = signal<AlertFilter>({});
 
-  // Computed summary counts
-  readonly resolvedCount = computed(() => {
-    return this.alerts().filter((a) => {
-      const name = a.state?.name?.toLowerCase() ?? '';
-      return name.includes('resuelta') || name.includes('resuelto');
-    }).length;
-  });
+  // Summary counts derived directly from server state aggregation
+  readonly resolvedCount = computed(() => this.stateCounts().resolved);
+  readonly processCount = computed(() => this.stateCounts().inProcess);
+  readonly pendingCount = computed(() => this.stateCounts().pending);
+  readonly rejectedCount = computed(() => this.stateCounts().rejected);
 
-  readonly processCount = computed(() => {
-    return this.alerts().filter((a) => {
-      const name = a.state?.name?.toLowerCase() ?? '';
-      return name.includes('proceso');
-    }).length;
-  });
-
-  readonly pendingCount = computed(() => {
-    return this.alerts().filter((a) => {
-      const name = a.state?.name?.toLowerCase() ?? '';
-      return name.includes('pendiente');
-    }).length;
-  });
-
-  readonly rejectedCount = computed(() => {
-    return this.alerts().filter((a) => {
-      const name = a.state?.name?.toLowerCase() ?? '';
-      return name.includes('rechazada') || name.includes('cancelada');
-    }).length;
-  });
 
   loadCatalogs(): void {
     // States
@@ -124,6 +112,9 @@ export class AlertsService {
         next: (response) => {
           this.alerts.set(response.alerts ?? []);
           this.total.set(response.total ?? 0);
+          if (response.stateCounts) {
+            this.stateCounts.set(response.stateCounts);
+          }
           if (filters?.page) {
             this.currentPage.set(filters.page);
           }
@@ -147,10 +138,13 @@ export class AlertsService {
           if (this.selectedAlert()?.id === id) {
             this.selectedAlert.set({ ...this.selectedAlert()!, ...res.alerts });
           }
+          // Reload alerts to refresh global counts and pagination
+          this.loadAlerts(this.activeFilters()).subscribe();
         }
       }),
     );
   }
+
 
   deletePendingAlerts(): Observable<{ ok: boolean; deletedCount: number }> {
     return this.http.delete<{ ok: boolean; deletedCount: number }>(this.API_URL).pipe(
