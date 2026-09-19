@@ -83,4 +83,30 @@ describe('AuthService', () => {
     expect(service.token()).toBeNull();
     expect(service.currentUser()).toBeNull();
   });
+
+  it('should fetch profile and update signals and local storage', () => {
+    const mockUser = {
+      id: '456',
+      name: 'Maria',
+      lastname: 'Lopez',
+      dni: '87654321',
+      phone: '912345678',
+      email: 'maria@example.com',
+      role: 'ADMIN' as const,
+      statusAccount: 'ACTIVO' as const,
+    };
+
+    service.fetchProfile().subscribe((user) => {
+      expect(user.name).toBe('Maria');
+      expect(user.lastname).toBe('Lopez');
+    });
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/auth/me`);
+    expect(req.request.method).toBe('GET');
+    req.flush(mockUser);
+
+    expect(service.currentUser()?.name).toBe('Maria');
+    expect(service.currentUser()?.lastname).toBe('Lopez');
+    expect(service.currentUser()?.dni).toBe('87654321');
+  });
 });

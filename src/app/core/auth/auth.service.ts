@@ -36,6 +36,17 @@ export class AuthService {
     );
   }
 
+  fetchProfile(): Observable<User> {
+    return this.http.get<User>(`${this.API_URL}/me`).pipe(
+      tap((user) => {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('saeta_user', JSON.stringify(user));
+        }
+        this.currentUser.set(user);
+      }),
+    );
+  }
+
   logout(): void {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('saeta_token');

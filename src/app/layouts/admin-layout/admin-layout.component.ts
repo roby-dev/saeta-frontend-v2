@@ -306,6 +306,14 @@ export class AdminLayoutComponent implements OnInit {
   ngOnInit(): void {
     this.checkScreenSize();
 
+    if (this.authService.isAuthenticated()) {
+      this.authService.fetchProfile().subscribe({
+        error: () => {
+          // Token may be invalid or server unreachable
+        },
+      });
+    }
+
     this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe((event) => {
