@@ -204,8 +204,9 @@ interface DistrictOption {
               </p>
               <p>
                 <b class="text-slate-700">Fecha:</b>
-                {{ selectedAlert()!.creationDate | date: 'dd/MM/yyyy HH:mm' }}
+                {{ selectedAlert()!.createdAt ? (selectedAlert()!.createdAt | date: 'dd/MM/yyyy HH:mm') : selectedAlert()!.creationDate }}
               </p>
+
               @if (selectedAlert()!.attendedBy) {
                 <p>
                   <b class="text-slate-700">Atendido por:</b>

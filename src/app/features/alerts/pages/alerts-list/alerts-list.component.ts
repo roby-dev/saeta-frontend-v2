@@ -247,8 +247,9 @@ import { AlertsService } from '../../services/alerts.service.js';
 
                     <!-- Fecha / Hora -->
                     <td class="py-3 px-4 text-slate-600 whitespace-nowrap">
-                      {{ alert.creationDate | date: 'dd/MM/yyyy HH:mm' }}
+                      {{ alert.createdAt ? (alert.createdAt | date: 'dd/MM/yyyy HH:mm') : alert.creationDate }}
                     </td>
+
 
                     <!-- Atendido Por -->
                     <td class="py-3 px-4">
