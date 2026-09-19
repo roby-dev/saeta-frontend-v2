@@ -68,29 +68,84 @@ interface MenuItem {
           </span>
         </div>
 
-        <!-- Topbar Right Profile & Actions -->
-        <div class="flex items-center gap-3 pr-4 md:pr-6">
-          <a routerLink="/profile" class="flex items-center gap-2.5 text-right hover:opacity-90 transition-opacity cursor-pointer" title="Ver mi perfil">
-            <div class="w-9 h-9 rounded-full bg-white/20 border border-white/40 flex items-center justify-center text-white font-bold text-xs shadow-inner">
+        <!-- Topbar Right Profile & Actions Dropdown -->
+        <div class="relative flex items-center pr-4 md:pr-6">
+          <!-- User Dropdown Trigger Button -->
+          <button
+            type="button"
+            (click)="toggleUserDropdown($event)"
+            class="flex items-center gap-2 text-right p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer select-none focus:outline-none"
+            title="Opciones de usuario"
+          >
+            <div class="w-9 h-9 rounded-full bg-white/20 border border-white/40 flex items-center justify-center text-white font-bold text-xs shadow-inner flex-shrink-0">
               {{ userInitials() }}
             </div>
             <div class="hidden sm:block text-left leading-tight">
-              <p class="text-xs font-bold text-white truncate max-w-[150px]">{{ userName() }}</p>
+              <p class="text-xs font-bold text-white truncate max-w-[140px]">{{ userName() }}</p>
               <span class="text-[10px] text-blue-200 font-semibold uppercase">{{ userRole() }}</span>
             </div>
-          </a>
-
-          <button
-            type="button"
-            (click)="logout()"
-            class="inline-flex items-center text-xs font-semibold bg-white/15 hover:bg-rose-600 hover:text-white text-white px-3 py-1.5 rounded transition-colors ml-2"
-            title="Cerrar sesión"
-          >
-            <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            <svg
+              class="w-3.5 h-3.5 text-blue-100 transition-transform duration-200"
+              [class.rotate-180]="isUserDropdownOpen()"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
-            Salir
           </button>
+
+          <!-- Dropdown Menu (Classic Admin Pro dw-user-box) -->
+          @if (isUserDropdownOpen()) {
+            <div
+              class="absolute right-4 top-14 w-60 bg-white rounded-lg shadow-2xl border border-slate-200 py-1 z-50 text-[#555f6d] animate-fade-in"
+              (click)="$event.stopPropagation()"
+            >
+              <!-- dw-user-box Header -->
+              <div class="px-4 py-3 border-b border-slate-100 flex items-center gap-3 bg-slate-50/60">
+                <div class="w-10 h-10 rounded-full bg-[#1976d2] text-white flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+                  {{ userInitials() }}
+                </div>
+                <div class="overflow-hidden leading-tight text-left">
+                  <h5 class="text-xs font-bold text-[#2b354f] truncate">{{ userName() }}</h5>
+                  <p class="text-[11px] text-slate-400 truncate">{{ userEmail() }}</p>
+                  <span class="inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-[#1976d2] uppercase">
+                    {{ userRole() }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Options -->
+              <div class="py-1 text-xs">
+                <a
+                  routerLink="/profile"
+                  (click)="closeUserDropdown()"
+                  class="flex items-center gap-2.5 px-4 py-2.5 text-slate-700 hover:bg-slate-100 hover:text-[#1976d2] transition-colors cursor-pointer font-medium"
+                >
+                  <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span>Mi Perfil</span>
+                </a>
+              </div>
+
+              <div class="border-t border-slate-100 my-0.5"></div>
+
+              <!-- Logout option -->
+              <div class="py-1 text-xs">
+                <button
+                  type="button"
+                  (click)="logout()"
+                  class="w-full flex items-center gap-2.5 px-4 py-2 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer font-medium text-left"
+                >
+                  <svg class="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            </div>
+          }
         </div>
       </header>
 
@@ -265,12 +320,10 @@ export class AdminLayoutComponent implements OnInit {
       icon: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>`,
       adminOnly: true,
     },
-    {
-      title: 'Mi Perfil',
-      url: '/profile',
-      icon: `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>`,
-    },
   ];
+
+  // User Dropdown in Header
+  readonly isUserDropdownOpen = signal<boolean>(false);
 
   protected readonly filteredMenu = computed(() => {
     const isAdmin = this.authService.userRole() === 'ADMIN';
@@ -324,10 +377,27 @@ export class AdminLayoutComponent implements OnInit {
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe((event) => {
         this.currentUrl.set(event.urlAfterRedirects);
+        this.isUserDropdownOpen.set(false);
         if (this.isMobile()) {
           this.sidebarState.set('closed');
         }
       });
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.isUserDropdownOpen()) {
+      this.isUserDropdownOpen.set(false);
+    }
+  }
+
+  toggleUserDropdown(event: Event): void {
+    event.stopPropagation();
+    this.isUserDropdownOpen.update((v) => !v);
+  }
+
+  closeUserDropdown(): void {
+    this.isUserDropdownOpen.set(false);
   }
 
   @HostListener('window:resize')
@@ -379,6 +449,7 @@ export class AdminLayoutComponent implements OnInit {
   }
 
   logout(): void {
+    this.closeUserDropdown();
     this.authService.logout();
   }
 }
