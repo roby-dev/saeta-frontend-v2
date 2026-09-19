@@ -14,15 +14,14 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm run build
 
-# Production runtime with Nginx
-FROM nginx:alpine AS runtime
+# Unprivileged Nginx runtime matching asia-novedades
+FROM nginxinc/nginx-unprivileged:1.29-alpine
 
-ENV PORT=80
-ENV NGINX_ENVSUBST_FILTER="PORT"
+COPY --from=build --chown=nginx:nginx /app/dist/saeta-frontend-v2/browser /usr/share/nginx/html
+COPY --chown=nginx:nginx nginx.conf.template /etc/nginx/nginx.conf.template
+COPY --chown=nginx:nginx --chmod=755 docker-entrypoint.sh /docker-entrypoint.sh
 
-COPY nginx.conf.template /etc/nginx/templates/default.conf.template
-COPY --from=build /app/dist/saeta-frontend-v2/browser /usr/share/nginx/html
+USER nginx
+EXPOSE 8080
 
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

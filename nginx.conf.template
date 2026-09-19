@@ -1,29 +1,46 @@
-server {
+worker_processes auto;
+pid /tmp/nginx.pid;
+
+events {
+  worker_connections 1024;
+}
+
+http {
+  include /etc/nginx/mime.types;
+  default_type application/octet-stream;
+  client_body_temp_path /tmp/client_temp;
+  access_log /dev/stdout;
+  error_log /dev/stderr warn;
+  sendfile on;
+  server_tokens off;
+
+  # Gzip compression
+  gzip on;
+  gzip_vary on;
+  gzip_min_length 1024;
+  gzip_proxied expired no-cache no-store private auth;
+  gzip_types text/plain text/css text/xml text/javascript application/javascript application/x-javascript application/xml application/json image/svg+xml;
+
+  server {
     listen ${PORT};
     server_name _;
-
     root /usr/share/nginx/html;
     index index.html;
-
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_proxied expired no-cache no-store private auth;
-    gzip_types text/plain text/css text/xml text/javascript application/javascript application/x-javascript application/xml application/json image/svg+xml;
+    client_max_body_size 10m;
 
     location / {
-        try_files $uri $uri/ /index.html;
+      try_files $uri $uri/ /index.html;
     }
 
     # Cache static assets
     location ~* \.(?:css|js|jpg|jpeg|gif|png|ico|cur|gz|svg|svgz|mp4|ogg|ogv|webm|htc|woff|woff2|ttf)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
+      expires 1y;
+      add_header Cache-Control "public, immutable";
     }
 
     # Never cache index.html
     location = /index.html {
-        add_header Cache-Control "no-store, no-cache, must-revalidate";
+      add_header Cache-Control "no-store, no-cache, must-revalidate";
     }
+  }
 }
