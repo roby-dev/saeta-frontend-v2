@@ -1,3 +1,29 @@
-/* You can add global styles to this file, and also import other style files */
-
 @import 'tailwindcss';
+
+/* Legacy SAETA Admin Design System Styles */
+.lstick {
+  width: 3px;
+  background-color: #009efb;
+  height: 24px;
+  margin-left: -20px;
+  margin-right: 14px;
+  display: inline-block;
+  vertical-align: middle;
+  border-radius: 1px;
+}
+
+.card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #2b354f;
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.card-legacy {
+  background-color: #ffffff;
+  border: 1px solid #e5e9f2;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
