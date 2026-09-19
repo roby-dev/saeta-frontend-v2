@@ -6,26 +6,20 @@ import { RouterOutlet } from '@angular/router';
   standalone: true,
   imports: [RouterOutlet],
   template: `
-    <div class="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div class="sm:mx-auto sm:w-full sm:max-w-md text-center mb-6">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/30 mb-4">
-          <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        </div>
-        <h1 class="text-3xl font-extrabold text-white tracking-tight">SAETA</h1>
-        <p class="mt-1 text-sm text-slate-400 font-medium">
-          Sistema de Atención y Emergencias de Seguridad Ciudadana
-        </p>
-      </div>
+    <div
+      class="min-h-screen bg-slate-900 bg-cover bg-center bg-no-repeat flex items-center justify-center p-4 relative"
+      style="background-image: url('/assets/images/banner_login.png');"
+    >
+      <!-- Subtle Dark Overlay for contrast -->
+      <div class="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"></div>
 
-      <div class="sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div class="bg-white/95 backdrop-blur-sm py-8 px-6 shadow-2xl rounded-2xl sm:px-10 border border-slate-700/20">
+      <div class="relative z-10 w-full max-w-md">
+        <div class="bg-white rounded shadow-2xl p-8 sm:p-10 border border-slate-200">
           <router-outlet />
         </div>
 
-        <div class="mt-8 text-center text-xs text-slate-500">
-          &copy; {{ currentYear }} Municipalidad Provincial de Tacna. Todos los derechos reservados.
+        <div class="mt-4 text-center text-xs text-white/80 drop-shadow font-medium">
+          &copy; {{ currentYear }} Municipalidad Provincial de Tacna — SAETA
         </div>
       </div>
     </div>

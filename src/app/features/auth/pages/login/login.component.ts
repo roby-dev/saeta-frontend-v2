@@ -11,8 +11,14 @@ import { ButtonComponent } from '../../../../shared/ui/button/button.component.j
   template: `
     <div>
       <div class="mb-6 text-center">
-        <h2 class="text-xl font-bold text-slate-900">Iniciar Sesión</h2>
-        <p class="text-xs text-slate-500 mt-1">Acceso a la plataforma operativa SAETA</p>
+        <img
+          src="/assets/images/logo/logo_login.png"
+          alt="SAETA"
+          class="h-16 mx-auto mb-3 object-contain"
+          onerror="this.style.display='none'"
+        />
+        <h2 class="text-xl font-bold text-[#455a64]">Iniciar Sesión</h2>
+        <p class="text-xs text-slate-400 mt-1">Acceso al Centro de Control de Seguridad</p>
       </div>
 
       @if (errorMessage()) {
