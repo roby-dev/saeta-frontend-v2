@@ -13,7 +13,7 @@ export const authGuard: CanActivateFn = () => {
   return router.createUrlTree(['/auth/login']);
 };
 
-export const publicGuard: CanActivateFn = () => {
+export const guestGuard: CanActivateFn = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
@@ -23,3 +23,6 @@ export const publicGuard: CanActivateFn = () => {
 
   return true;
 };
+
+// Aliased for backwards compatibility
+export const publicGuard = guestGuard;

@@ -1,11 +1,11 @@
 import { Routes } from '@angular/router';
-import { authGuard, publicGuard } from './core/auth/auth.guard.js';
+import { authGuard, guestGuard } from './core/auth/auth.guard.js';
 
 export const routes: Routes = [
   // Exposed Auth Layout (Public)
   {
     path: 'auth',
-    canActivate: [publicGuard],
+    canActivate: [guestGuard],
     loadComponent: () =>
       import('./layouts/auth-layout/auth-layout.component.js').then(
         (m) => m.AuthLayoutComponent,

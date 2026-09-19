@@ -17,6 +17,7 @@ export class AuthService {
   // Signals
   readonly currentUser = signal<User | null>(this.loadStoredUser());
   readonly token = signal<string | null>(this.loadStoredToken());
+  readonly refreshTokenSignal = signal<string | null>(this.loadStoredRefreshToken());
 
   // Computed Signals
   readonly isAuthenticated = computed(() => Boolean(this.token()));
@@ -30,10 +31,27 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.API_URL}/login`, credentials).pipe(
       tap((response) => {
         if (response.accessToken && response.user) {
-          this.setSession(response.accessToken, response.user);
+          this.setSession(response.accessToken, response.refreshToken ?? null, response.user);
         }
       }),
     );
+  }
+
+  refreshToken(): Observable<AuthResponse> {
+    const currentRefresh = this.getRefreshToken();
+    return this.http
+      .post<AuthResponse>(`${this.API_URL}/refresh`, { refreshToken: currentRefresh })
+      .pipe(
+        tap((response) => {
+          if (response.accessToken && response.user) {
+            this.setSession(
+              response.accessToken,
+              response.refreshToken ?? currentRefresh,
+              response.user,
+            );
+          }
+        }),
+      );
   }
 
   fetchProfile(): Observable<User> {
@@ -50,25 +68,42 @@ export class AuthService {
   logout(): void {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('saeta_token');
+      localStorage.removeItem('saeta_refresh_token');
       localStorage.removeItem('saeta_user');
     }
     this.token.set(null);
+    this.refreshTokenSignal.set(null);
     this.currentUser.set(null);
     this.router.navigate(['/auth/login']);
   }
 
-  private setSession(token: string, user: User): void {
+  getRefreshToken(): string | null {
+    return this.refreshTokenSignal() ?? this.loadStoredRefreshToken();
+  }
+
+  private setSession(token: string, refreshToken: string | null, user: User): void {
     if (typeof window !== 'undefined') {
       localStorage.setItem('saeta_token', token);
+      if (refreshToken) {
+        localStorage.setItem('saeta_refresh_token', refreshToken);
+      }
       localStorage.setItem('saeta_user', JSON.stringify(user));
     }
     this.token.set(token);
+    if (refreshToken) {
+      this.refreshTokenSignal.set(refreshToken);
+    }
     this.currentUser.set(user);
   }
 
   private loadStoredToken(): string | null {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('saeta_token');
+  }
+
+  private loadStoredRefreshToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('saeta_refresh_token');
   }
 
   private loadStoredUser(): User | null {
