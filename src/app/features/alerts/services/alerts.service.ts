@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../../environments/environment.js';
+import { RealtimeService } from '../../../core/services/realtime.service.js';
 import type {
   Alert,
   AlertFilter,
@@ -17,6 +18,7 @@ import type {
 })
 export class AlertsService {
   private readonly http = inject(HttpClient);
+  private readonly realtimeService = inject(RealtimeService);
   private readonly API_URL = `${environment.apiUrl}/alerts`;
 
   // Signals
@@ -47,6 +49,63 @@ export class AlertsService {
   readonly processCount = computed(() => this.stateCounts().inProcess);
   readonly pendingCount = computed(() => this.stateCounts().pending);
   readonly rejectedCount = computed(() => this.stateCounts().rejected);
+
+  constructor() {
+    this.initRealtimeSubscriptions();
+  }
+
+  private initRealtimeSubscriptions(): void {
+    this.realtimeService.alertCreated$.subscribe((alert) => {
+      this.handleRealtimeCreated(alert);
+    });
+
+    this.realtimeService.alertUpdated$.subscribe((alert) => {
+      this.handleRealtimeUpdated(alert);
+    });
+  }
+
+  handleRealtimeCreated(alert: Alert): void {
+    this.alerts.update((list) => {
+      const exists = list.some((a) => a.id === alert.id);
+      if (exists) {
+        return list.map((a) => (a.id === alert.id ? alert : a));
+      }
+      return [alert, ...list];
+    });
+    this.total.update((t) => t + 1);
+    this.refreshStateCounts();
+  }
+
+  handleRealtimeUpdated(alert: Alert): void {
+    this.alerts.update((list) => {
+      const exists = list.some((a) => a.id === alert.id);
+      if (!exists) {
+        return [alert, ...list];
+      }
+      return list.map((a) => (a.id === alert.id ? { ...a, ...alert } : a));
+    });
+
+    if (this.selectedAlert()?.id === alert.id) {
+      this.selectedAlert.set({ ...this.selectedAlert()!, ...alert });
+    }
+
+    this.refreshStateCounts();
+  }
+
+  private refreshStateCounts(): void {
+    this.http
+      .get<AlertsResponse>(this.API_URL, {
+        params: new HttpParams().set('page', '1').set('limit', '1'),
+      })
+      .subscribe({
+        next: (response) => {
+          if (response.stateCounts) {
+            this.stateCounts.set(response.stateCounts);
+          }
+        },
+        error: () => {},
+      });
+  }
 
 
   loadCatalogs(): void {

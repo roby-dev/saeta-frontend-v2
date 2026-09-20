@@ -3,12 +3,16 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { environment } from '../../../../environments/environment.js';
+import { Subject } from 'rxjs';
+import { RealtimeService } from '../../../core/services/realtime.service.js';
 import type { Alert } from '../models/alert.model.js';
 import { AlertsService } from './alerts.service.js';
 
 describe('AlertsService', () => {
   let service: AlertsService;
   let httpMock: HttpTestingController;
+  let alertCreated$: Subject<Alert>;
+  let alertUpdated$: Subject<Alert>;
 
   const mockAlerts: Alert[] = [
     {
@@ -47,8 +51,22 @@ describe('AlertsService', () => {
   ];
 
   beforeEach(() => {
+    alertCreated$ = new Subject<Alert>();
+    alertUpdated$ = new Subject<Alert>();
+
     TestBed.configureTestingModule({
-      providers: [AlertsService, provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        AlertsService,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: RealtimeService,
+          useValue: {
+            alertCreated$: alertCreated$.asObservable(),
+            alertUpdated$: alertUpdated$.asObservable(),
+          },
+        },
+      ],
     });
 
     service = TestBed.inject(AlertsService);
@@ -180,4 +198,59 @@ describe('AlertsService', () => {
     expect(found?.state?.name).toBe('En proceso');
     expect(service.processCount()).toBe(2);
   });
+
+  it('handles realtime alertCreated by adding the alert to the signals', () => {
+    service.alerts.set(mockAlerts);
+    service.total.set(3);
+
+    const liveAlert: Alert = {
+      id: 'alert-live-99',
+      userId: 'user-new',
+      latitude: -18.01,
+      longitude: -70.25,
+      typeId: 'type-1',
+      stateId: 'state-1',
+      creationDate: '2026-09-19T20:00:00.000Z',
+      state: { id: 'state-1', name: 'Pendiente' },
+    };
+
+    alertCreated$.next(liveAlert);
+
+    const reqStateCounts = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqStateCounts.flush({
+      ok: true,
+      alerts: [],
+      total: 4,
+      stateCounts: { pending: 2, inProcess: 1, resolved: 1, rejected: 0, total: 4 },
+    });
+
+    expect(service.alerts().length).toBe(4);
+    expect(service.alerts()[0].id).toBe('alert-live-99');
+    expect(service.total()).toBe(4);
+    expect(service.pendingCount()).toBe(2);
+  });
+
+  it('handles realtime alertUpdated by updating the existing alert in signals', () => {
+    service.alerts.set(mockAlerts);
+
+    const updatedAlert: Alert = {
+      ...mockAlerts[0],
+      state: { id: 'state-2', name: 'En proceso' },
+    };
+
+    alertUpdated$.next(updatedAlert);
+
+    const reqStateCounts = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqStateCounts.flush({
+      ok: true,
+      alerts: [],
+      total: 3,
+      stateCounts: { pending: 0, inProcess: 2, resolved: 1, rejected: 0, total: 3 },
+    });
+
+    const found = service.alerts().find((a) => a.id === 'alert-1');
+    expect(found?.state?.name).toBe('En proceso');
+    expect(service.processCount()).toBe(2);
+  });
 });
+

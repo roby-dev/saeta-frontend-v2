@@ -3,6 +3,7 @@ import {
   AfterViewInit,
   Component,
   computed,
+  effect,
   ElementRef,
   inject,
   OnDestroy,
@@ -11,7 +12,9 @@ import {
   ViewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import * as L from 'leaflet';
+import { RealtimeService } from '../../../../core/services/realtime.service.js';
 import type { Alert, AlertUserSummary } from '../../models/alert.model.js';
 import { AlertsService } from '../../services/alerts.service.js';
 
@@ -34,9 +37,23 @@ interface DistrictOption {
       <div class="w-full lg:w-80 flex-shrink-0 space-y-4">
         <!-- Filter Card -->
         <div class="bg-white p-4 rounded border border-[#e5edef] shadow-sm space-y-3">
-          <h4 class="card-title text-sm font-bold text-[#455a64] flex items-center">
-            <span class="lstick"></span>Filtros del Mapa
-          </h4>
+          <div class="flex items-center justify-between">
+            <h4 class="card-title text-sm font-bold text-[#455a64] flex items-center">
+              <span class="lstick"></span>Filtros del Mapa
+            </h4>
+            <div class="flex items-center gap-1.5" title="Estado de conexión en tiempo real">
+              <span
+                class="w-2.5 h-2.5 rounded-full"
+                [ngClass]="realtimeService.isConnected() ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse' : 'bg-slate-300'"
+              ></span>
+              <span
+                class="text-[11px] font-semibold"
+                [ngClass]="realtimeService.isConnected() ? 'text-emerald-600' : 'text-slate-400'"
+              >
+                {{ realtimeService.isConnected() ? 'En vivo' : 'Desconectado' }}
+              </span>
+            </div>
+          </div>
 
           <div class="flex items-center justify-between text-xs text-slate-500 font-medium pb-2 border-b border-slate-100">
             <span>Total en Mapa:</span>
@@ -290,10 +307,24 @@ interface DistrictOption {
 })
 export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly alertsService = inject(AlertsService);
+  protected readonly realtimeService = inject(RealtimeService);
 
   @ViewChild('mapContainer') mapContainer!: ElementRef<HTMLDivElement>;
   private map?: L.Map;
   private markersLayer?: L.LayerGroup;
+  private personnelLayer?: L.LayerGroup;
+  private readonly personnelMarkers = new Map<string, L.Marker>();
+  private readonly subs = new Subscription();
+
+  constructor() {
+    effect(() => {
+      // Re-run whenever displayedAlerts signal changes
+      this.displayedAlerts();
+      if (this.map && this.markersLayer) {
+        this.updateMarkers();
+      }
+    });
+  }
 
   // Tacna geographical center default
   private readonly TACNA_CENTER: L.LatLngTuple = [-18.0146, -70.2536];
@@ -360,6 +391,18 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     this.alertsService.loadAlerts({ all: true }).subscribe(() => {
       this.updateMarkers();
     });
+
+    this.subs.add(
+      this.realtimeService.locationUpdated$.subscribe(({ user, coords }) => {
+        this.updatePersonnelLocation(user, coords);
+      }),
+    );
+
+    this.subs.add(
+      this.realtimeService.personalDisconnected$.subscribe((userId) => {
+        this.removePersonnelMarker(userId);
+      }),
+    );
   }
 
   ngAfterViewInit(): void {
@@ -369,6 +412,8 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.subs.unsubscribe();
+    this.personnelMarkers.clear();
     if (this.map) {
       this.map.remove();
     }
@@ -387,7 +432,58 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     }).addTo(this.map);
 
     this.markersLayer = L.layerGroup().addTo(this.map);
+    this.personnelLayer = L.layerGroup().addTo(this.map);
     this.updateMarkers();
+  }
+
+  private updatePersonnelLocation(user: any, coords: [number, number]): void {
+    const userId = user?.id || user?._id;
+    if (!userId || !this.map || !this.personnelLayer) return;
+
+    const existing = this.personnelMarkers.get(userId);
+    if (existing) {
+      existing.setLatLng(coords);
+    } else {
+      const name = user?.name ? `${user.name} ${user.lastname ?? ''}`.trim() : 'Personal de Seguridad';
+      const icon = L.divIcon({
+        className: 'custom-police-pin',
+        html: `
+          <div style="
+            background-color: #009efb;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2.5px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+          ">
+            👮
+          </div>
+        `,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      });
+
+      const marker = L.marker(coords, { icon });
+      marker.bindTooltip(`<b>👮 ${name}</b><br><span style="color:#009efb;">En patrullaje</span>`, {
+        direction: 'top',
+        offset: [0, -10],
+      });
+
+      this.personnelLayer.addLayer(marker);
+      this.personnelMarkers.set(userId, marker);
+    }
+  }
+
+  private removePersonnelMarker(userId: string): void {
+    const marker = this.personnelMarkers.get(userId);
+    if (marker && this.personnelLayer) {
+      this.personnelLayer.removeLayer(marker);
+      this.personnelMarkers.delete(userId);
+    }
   }
 
   private updateMarkers(): void {

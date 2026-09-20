@@ -7,11 +7,19 @@ import type { Alert } from '../../models/alert.model.js';
 import { AlertsService } from '../../services/alerts.service.js';
 import { AlertsMapComponent } from './alerts-map.component.js';
 
+import { signal } from '@angular/core';
+import { Subject } from 'rxjs';
+import { RealtimeService } from '../../../../core/services/realtime.service.js';
+
 describe('AlertsMapComponent', () => {
   let component: AlertsMapComponent;
   let fixture: ComponentFixture<AlertsMapComponent>;
   let alertsService: AlertsService;
   let httpMock: HttpTestingController;
+  let locationUpdated$: Subject<any>;
+  let personalDisconnected$: Subject<string>;
+  let alertCreated$: Subject<Alert>;
+  let alertUpdated$: Subject<Alert>;
 
   const mockAlerts: Alert[] = [
     {
@@ -59,9 +67,27 @@ describe('AlertsMapComponent', () => {
   ];
 
   beforeEach(async () => {
+    locationUpdated$ = new Subject();
+    personalDisconnected$ = new Subject();
+    alertCreated$ = new Subject();
+    alertUpdated$ = new Subject();
+
+    const mockRealtime = {
+      isConnected: signal(true),
+      locationUpdated$: locationUpdated$.asObservable(),
+      personalDisconnected$: personalDisconnected$.asObservable(),
+      alertCreated$: alertCreated$.asObservable(),
+      alertUpdated$: alertUpdated$.asObservable(),
+    };
+
     await TestBed.configureTestingModule({
       imports: [AlertsMapComponent],
-      providers: [AlertsService, provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        AlertsService,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: RealtimeService, useValue: mockRealtime },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(AlertsMapComponent);
@@ -181,5 +207,21 @@ describe('AlertsMapComponent', () => {
 
     expect(component['getAlertStateName'](mockAlerts[0])).toBe('Pendiente');
     expect(component['getAlertStateName'](mockAlerts[3])).toBe('Cancelada');
+  });
+
+  it('should handle realtime personnel location updates and disconnection', () => {
+    flushInitRequests();
+
+    // Push location update
+    locationUpdated$.next({
+      user: { id: 'sec-1', name: 'Officer Test', lastname: '1' },
+      coords: [-18.01, -70.25],
+    });
+
+    expect(component['personnelMarkers'].has('sec-1')).toBe(true);
+
+    // Push disconnect
+    personalDisconnected$.next('sec-1');
+    expect(component['personnelMarkers'].has('sec-1')).toBe(false);
   });
 });
