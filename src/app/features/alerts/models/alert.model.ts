@@ -52,6 +52,7 @@ export interface AlertFilter {
   search?: string;
   page?: number;
   limit?: number;
+  all?: boolean;
   dateRange?: 'today' | 'yesterday' | 'week' | 'month' | 'year' | 'all';
 }
 

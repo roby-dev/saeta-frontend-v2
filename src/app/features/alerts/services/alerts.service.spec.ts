@@ -129,6 +129,27 @@ describe('AlertsService', () => {
     expect(service.rejectedCount()).toBe(0);
   });
 
+  it('loads all alerts unpaginated when all is true without page or limit params', () => {
+    service.loadAlerts({ all: true }).subscribe();
+
+    const req = httpMock.expectOne(
+      (r) =>
+        r.url === `${environment.apiUrl}/alerts` &&
+        r.params.get('all') === 'true' &&
+        !r.params.has('page') &&
+        !r.params.has('limit'),
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      ok: true,
+      alerts: mockAlerts,
+      total: 3,
+      stateCounts: { pending: 1, inProcess: 1, resolved: 1, rejected: 0, total: 3 },
+    });
+
+    expect(service.alerts().length).toBe(3);
+  });
+
   it('updates alert state, reflects in signals, and triggers reload', () => {
     service.alerts.set(mockAlerts);
 

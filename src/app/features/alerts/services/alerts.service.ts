@@ -92,9 +92,15 @@ export class AlertsService {
   loadAlerts(filters?: AlertFilter): Observable<AlertsResponse> {
     this.loading.set(true);
 
-    let params = new HttpParams()
-      .set('page', String(filters?.page ?? this.currentPage()))
-      .set('limit', String(filters?.limit ?? this.pageSize()));
+    let params = new HttpParams();
+
+    if (filters?.all) {
+      params = params.set('all', 'true');
+    } else {
+      params = params
+        .set('page', String(filters?.page ?? this.currentPage()))
+        .set('limit', String(filters?.limit ?? this.pageSize()));
+    }
 
     if (filters?.stateId) {
       params = params.set('stateId', filters.stateId);
