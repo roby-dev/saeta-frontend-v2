@@ -12,6 +12,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import * as L from 'leaflet';
 import { RealtimeService } from '../../../../core/services/realtime.service.js';
@@ -308,6 +309,7 @@ interface DistrictOption {
 export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly alertsService = inject(AlertsService);
   protected readonly realtimeService = inject(RealtimeService);
+  private readonly route = inject(ActivatedRoute);
 
   @ViewChild('mapContainer') mapContainer!: ElementRef<HTMLDivElement>;
   private map?: L.Map;
@@ -390,7 +392,17 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     // Load all alerts unpaginated for full map visualization
     this.alertsService.loadAlerts({ all: true }).subscribe(() => {
       this.updateMarkers();
+      this.checkRouteAlertId();
     });
+
+    this.subs.add(
+      this.route.queryParams.subscribe((params) => {
+        const alertId = params['alertId'];
+        if (alertId) {
+          this.focusAlertById(alertId);
+        }
+      }),
+    );
 
     this.subs.add(
       this.realtimeService.locationUpdated$.subscribe(({ user, coords }) => {
@@ -403,6 +415,21 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
         this.removePersonnelMarker(userId);
       }),
     );
+  }
+
+  private focusAlertById(alertId: string): void {
+    const alert = this.alertsService.alerts().find((a) => a.id === alertId);
+    if (alert) {
+      this.selectedAlert.set(alert);
+      this.centerOnAlert(alert);
+    }
+  }
+
+  private checkRouteAlertId(): void {
+    const alertId = this.route.snapshot.queryParams['alertId'];
+    if (alertId) {
+      this.focusAlertById(alertId);
+    }
   }
 
   ngAfterViewInit(): void {

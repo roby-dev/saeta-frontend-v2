@@ -10,6 +10,8 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service.js';
 
+import { ToastContainerComponent } from '../../shared/ui/toast/toast-container.component.js';
+
 export type SidebarState = 'full' | 'mini' | 'closed';
 
 interface MenuItem {
@@ -22,9 +24,11 @@ interface MenuItem {
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastContainerComponent],
   template: `
     <div class="min-h-screen flex flex-col bg-[#f4f6f9] text-[#67757c] font-sans antialiased">
+      <!-- Toast Container for Realtime Alerts -->
+      <app-toast-container />
       <!-- ============================================================== -->
       <!-- Topbar Header (Classic Admin Pro #1976d2 Blue)                 -->
       <!-- ============================================================== -->

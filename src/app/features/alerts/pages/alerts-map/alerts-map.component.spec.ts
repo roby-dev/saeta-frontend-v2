@@ -8,7 +8,8 @@ import { AlertsService } from '../../services/alerts.service.js';
 import { AlertsMapComponent } from './alerts-map.component.js';
 
 import { signal } from '@angular/core';
-import { Subject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
 import { RealtimeService } from '../../../../core/services/realtime.service.js';
 
 describe('AlertsMapComponent', () => {
@@ -20,6 +21,7 @@ describe('AlertsMapComponent', () => {
   let personalDisconnected$: Subject<string>;
   let alertCreated$: Subject<Alert>;
   let alertUpdated$: Subject<Alert>;
+  let queryParams$: BehaviorSubject<Record<string, any>>;
 
   const mockAlerts: Alert[] = [
     {
@@ -71,6 +73,7 @@ describe('AlertsMapComponent', () => {
     personalDisconnected$ = new Subject();
     alertCreated$ = new Subject();
     alertUpdated$ = new Subject();
+    queryParams$ = new BehaviorSubject<Record<string, any>>({});
 
     const mockRealtime = {
       isConnected: signal(true),
@@ -87,6 +90,13 @@ describe('AlertsMapComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: RealtimeService, useValue: mockRealtime },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            queryParams: queryParams$.asObservable(),
+            snapshot: { queryParams: queryParams$.value },
+          },
+        },
       ],
     }).compileComponents();
 
@@ -223,5 +233,15 @@ describe('AlertsMapComponent', () => {
     // Push disconnect
     personalDisconnected$.next('sec-1');
     expect(component['personnelMarkers'].has('sec-1')).toBe(false);
+  });
+
+  it('should focus and select alert when alertId query parameter is provided', () => {
+    flushInitRequests();
+
+    queryParams$.next({ alertId: 'alert-2' });
+    fixture.detectChanges();
+
+    expect(component['selectedAlert']()).toBeTruthy();
+    expect(component['selectedAlert']()?.id).toBe('alert-2');
   });
 });

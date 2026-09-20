@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../../environments/environment.js';
+import { NotificationService } from '../../../core/services/notification.service.js';
 import { RealtimeService } from '../../../core/services/realtime.service.js';
 import type {
   Alert,
@@ -19,6 +20,7 @@ import type {
 export class AlertsService {
   private readonly http = inject(HttpClient);
   private readonly realtimeService = inject(RealtimeService);
+  private readonly notificationService = inject(NotificationService);
   private readonly API_URL = `${environment.apiUrl}/alerts`;
 
   // Signals
@@ -74,6 +76,7 @@ export class AlertsService {
     });
     this.total.update((t) => t + 1);
     this.refreshStateCounts();
+    this.notificationService.showEmergency(alert);
   }
 
   handleRealtimeUpdated(alert: Alert): void {

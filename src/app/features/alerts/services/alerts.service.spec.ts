@@ -1,9 +1,10 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { environment } from '../../../../environments/environment.js';
 import { Subject } from 'rxjs';
+import { NotificationService } from '../../../core/services/notification.service.js';
 import { RealtimeService } from '../../../core/services/realtime.service.js';
 import type { Alert } from '../models/alert.model.js';
 import { AlertsService } from './alerts.service.js';
@@ -13,6 +14,7 @@ describe('AlertsService', () => {
   let httpMock: HttpTestingController;
   let alertCreated$: Subject<Alert>;
   let alertUpdated$: Subject<Alert>;
+  let notificationServiceMock: { showEmergency: ReturnType<typeof vi.fn> };
 
   const mockAlerts: Alert[] = [
     {
@@ -53,6 +55,9 @@ describe('AlertsService', () => {
   beforeEach(() => {
     alertCreated$ = new Subject<Alert>();
     alertUpdated$ = new Subject<Alert>();
+    notificationServiceMock = {
+      showEmergency: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -65,6 +70,10 @@ describe('AlertsService', () => {
             alertCreated$: alertCreated$.asObservable(),
             alertUpdated$: alertUpdated$.asObservable(),
           },
+        },
+        {
+          provide: NotificationService,
+          useValue: notificationServiceMock,
         },
       ],
     });
@@ -228,6 +237,7 @@ describe('AlertsService', () => {
     expect(service.alerts()[0].id).toBe('alert-live-99');
     expect(service.total()).toBe(4);
     expect(service.pendingCount()).toBe(2);
+    expect(notificationServiceMock.showEmergency).toHaveBeenCalledWith(liveAlert);
   });
 
   it('handles realtime alertUpdated by updating the existing alert in signals', () => {
