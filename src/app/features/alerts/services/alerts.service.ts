@@ -195,7 +195,10 @@ export class AlertsService {
     );
   }
 
-  updateAlert(id: string, payload: Partial<Alert>): Observable<{ ok: boolean; alerts: Alert }> {
+  updateAlert(
+    id: string,
+    payload: Partial<Alert> | Record<string, unknown>,
+  ): Observable<{ ok: boolean; alerts: Alert }> {
     return this.http.put<{ ok: boolean; alerts: Alert }>(`${this.API_URL}/${id}`, payload).pipe(
       tap((res) => {
         if (res.ok && res.alerts) {

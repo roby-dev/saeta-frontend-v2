@@ -639,9 +639,11 @@ export class AlertsListComponent implements OnInit {
 
     this.isSaving.set(true);
 
-    const payload: Partial<Alert> = {
+    const payload = {
       stateId: this.modalStateId,
+      state: this.modalStateId,
       attendedById: this.modalAttendedById || undefined,
+      attendedBy: this.modalAttendedById || undefined,
       commentary: this.modalCommentary || undefined,
     };
 

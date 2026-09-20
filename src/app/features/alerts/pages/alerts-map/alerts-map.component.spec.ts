@@ -244,4 +244,58 @@ describe('AlertsMapComponent', () => {
     expect(component['selectedAlert']()).toBeTruthy();
     expect(component['selectedAlert']()?.id).toBe('alert-2');
   });
+
+  it('should open delegate modal with process state preselected', () => {
+    flushInitRequests();
+
+    component.openDelegateModal(mockAlerts[0]);
+    expect(component['managingAlert']()).toEqual(mockAlerts[0]);
+    expect(component['modalStateId']).toBe('state-process');
+  });
+
+  it('should save alert changes and update selected alert', () => {
+    flushInitRequests();
+
+    component.openManageModal(mockAlerts[0]);
+    component['modalStateId'] = 'state-resolved';
+    component['modalCommentary'] = 'Atendido en mapa';
+
+    component.saveAlertChanges();
+
+    const reqPut = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1`);
+    expect(reqPut.request.method).toBe('PUT');
+    const updated: Alert = { ...mockAlerts[0], stateId: 'state-resolved' };
+    reqPut.flush({ ok: true, alerts: updated });
+
+    // AlertsService reload triggers loadAlerts
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqReload.flush({ ok: true, alerts: [updated] });
+
+    expect(component['managingAlert']()).toBeNull();
+    expect(component['selectedAlert']()?.stateId).toBe('state-resolved');
+  });
+
+  it('should toggle and clear route to personnel on the map', () => {
+    flushInitRequests();
+
+    // Add officer marker
+    locationUpdated$.next({
+      user: { id: 'user-2', name: 'Officer Test', lastname: '2' },
+      coords: [-18.02, -70.25],
+    });
+
+    const alertWithOfficer: Alert = {
+      ...mockAlerts[1],
+      attendedById: 'user-2',
+      attendedBy: { id: 'user-2', name: 'Officer Test' },
+    };
+
+    component.toggleRouteToPersonnel(alertWithOfficer);
+    expect(component['isRoutingActive']()).toBe(true);
+    expect(component['routeLine']).toBeDefined();
+
+    component.clearRoute();
+    expect(component['isRoutingActive']()).toBe(false);
+    expect(component['routeLine']).toBeUndefined();
+  });
 });

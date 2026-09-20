@@ -231,7 +231,7 @@ interface DistrictOption {
               </div>
               <button
                 type="button"
-                (click)="selectedAlert.set(null)"
+                (click)="selectedAlert.set(null); clearRoute()"
                 class="text-slate-400 hover:text-slate-600 font-bold"
               >
                 ✕
@@ -281,24 +281,184 @@ interface DistrictOption {
                 <p class="text-amber-500 font-bold">
                   <b>Calificación:</b> ★ {{ selectedAlert()!.score }} / 5
                 </p>
+                @if (selectedAlert()!.commentary) {
+                  <p class="text-slate-500 italic bg-amber-50/60 p-1.5 rounded border border-amber-200">
+                    "{{ selectedAlert()!.commentary }}"
+                  </p>
+                }
               }
             </div>
 
-            <div class="pt-2 border-t border-slate-100 flex gap-2">
-              <button
-                type="button"
-                (click)="centerOnAlert(selectedAlert()!)"
-                class="flex-1 text-center py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors"
-              >
-                Enfocar
-              </button>
-              <a
-                [href]="'https://www.google.com/maps?q=' + selectedAlert()!.latitude + ',' + selectedAlert()!.longitude"
-                target="_blank"
-                class="flex-1 text-center py-1.5 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white text-xs font-semibold transition-colors"
-              >
-                Navegar GPS ↗
-              </a>
+            <!-- Action Buttons based on Alert State -->
+            <div class="pt-2.5 mt-1 border-t border-slate-100 flex flex-col gap-1.5">
+              @if (getAlertStateName(selectedAlert()!).toLowerCase().includes('pendiente')) {
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    (click)="openDelegateModal(selectedAlert()!)"
+                    class="flex-1 py-1.5 px-2 bg-[#009efb] hover:bg-[#0088db] text-white rounded text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <span>Delegar / Atender</span>
+                  </button>
+                  <button
+                    type="button"
+                    (click)="rejectAlert(selectedAlert()!)"
+                    class="py-1.5 px-3 border border-rose-300 hover:bg-rose-50 text-rose-600 rounded text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Rechazar
+                  </button>
+                </div>
+              } @else if (getAlertStateName(selectedAlert()!).toLowerCase().includes('proceso')) {
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    (click)="toggleRouteToPersonnel(selectedAlert()!)"
+                    class="flex-1 py-1.5 px-2 rounded text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1 text-white cursor-pointer"
+                    [ngClass]="isRoutingActive() ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                  >
+                    <span>{{ isRoutingActive() ? 'Ocultar Ruta' : 'Trazar Ruta' }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    (click)="openManageModal(selectedAlert()!)"
+                    class="flex-1 py-1.5 px-2 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                  >
+                    Gestionar
+                  </button>
+                </div>
+              } @else {
+                <button
+                  type="button"
+                  (click)="openManageModal(selectedAlert()!)"
+                  class="w-full py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Ver / Modificar Alerta
+                </button>
+              }
+
+              <!-- Navigation & Focus Row -->
+              <div class="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  (click)="centerOnAlert(selectedAlert()!)"
+                  class="flex-1 text-center py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Enfocar
+                </button>
+                <a
+                  [href]="'https://www.google.com/maps?q=' + selectedAlert()!.latitude + ',' + selectedAlert()!.longitude"
+                  target="_blank"
+                  class="flex-1 text-center py-1.5 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white text-xs font-semibold transition-colors"
+                >
+                  Navegar GPS ↗
+                </a>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Alert Management Modal (Map View) -->
+        @if (managingAlert()) {
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div class="bg-white rounded-lg max-w-lg w-full overflow-hidden shadow-2xl animate-fade-in border border-slate-200">
+              <!-- Modal Header -->
+              <div class="bg-[#1976d2] px-6 py-4 text-white flex items-center justify-between">
+                <h5 class="text-base font-bold">
+                  Gestionar Alerta #{{ managingAlert()!.id.slice(-6).toUpperCase() }}
+                </h5>
+                <button
+                  type="button"
+                  (click)="closeManageModal()"
+                  class="text-white hover:text-rose-200 font-bold text-lg cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <!-- Modal Body -->
+              <div class="p-6 space-y-4 text-xs text-slate-600 max-h-[80vh] overflow-y-auto">
+                <!-- Citizen Info Banner -->
+                <div class="p-3 bg-slate-50 rounded border border-slate-200 flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-[#1976d2] text-white flex items-center justify-center font-bold text-sm">
+                    {{ managingAlert()!.user?.name?.charAt(0) || 'C' }}
+                  </div>
+                  <div>
+                    <h6 class="font-bold text-slate-800 text-sm">
+                      {{ managingAlert()!.user?.name }} {{ managingAlert()!.user?.lastname }}
+                    </h6>
+                    <p class="text-slate-400">
+                      DNI: {{ managingAlert()!.user?.dni || 'S/D' }} | Tel: {{ managingAlert()!.user?.phone || 'S/D' }}
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Location Info -->
+                <div>
+                  <span class="font-bold text-slate-700 block mb-1">Ubicación GPS:</span>
+                  <p class="font-mono text-[11px] text-slate-500">
+                    Lat: {{ managingAlert()!.latitude }}, Lon: {{ managingAlert()!.longitude }}
+                  </p>
+                </div>
+
+                <!-- Update State -->
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">Estado de la Alerta:</label>
+                  <select
+                    [(ngModel)]="modalStateId"
+                    class="w-full p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white text-xs"
+                  >
+                    @for (st of alertsService.states(); track st.id) {
+                      <option [value]="st.id">{{ st.name }}</option>
+                    }
+                  </select>
+                </div>
+
+                <!-- Assign Personnel -->
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">Asignar Personal de Seguridad:</label>
+                  <select
+                    [(ngModel)]="modalAttendedById"
+                    class="w-full p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white text-xs"
+                  >
+                    <option value="">-- Sin asignar --</option>
+                    @for (p of alertsService.personnel(); track p.id) {
+                      <option [value]="p.id">
+                        {{ p.name }} {{ p.lastname }} ({{ p.role }})
+                      </option>
+                    }
+                  </select>
+                </div>
+
+                <!-- Notes / Commentary -->
+                <div>
+                  <label class="block font-bold text-slate-700 mb-1">Comentario / Bitácora de Atención:</label>
+                  <textarea
+                    [(ngModel)]="modalCommentary"
+                    rows="3"
+                    placeholder="Detalles sobre la atención del incidente..."
+                    class="w-full p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none text-xs"
+                  ></textarea>
+                </div>
+              </div>
+
+              <!-- Modal Footer -->
+              <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+                <button
+                  type="button"
+                  (click)="closeManageModal()"
+                  class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded text-xs cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  (click)="saveAlertChanges()"
+                  [disabled]="isSavingAlert()"
+                  class="px-4 py-2 bg-[#1976d2] hover:bg-[#1565c0] text-white font-semibold rounded text-xs disabled:opacity-50 cursor-pointer"
+                >
+                  {{ isSavingAlert() ? 'Guardando...' : 'Guardar Cambios' }}
+                </button>
+              </div>
             </div>
           </div>
         }
@@ -343,6 +503,13 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly selectedDistrictId = signal<string>('');
   protected readonly selectedStateFilter = signal<string>('all');
   protected readonly selectedAlert = signal<Alert | null>(null);
+  protected readonly managingAlert = signal<Alert | null>(null);
+  protected readonly isSavingAlert = signal<boolean>(false);
+  protected readonly isRoutingActive = signal<boolean>(false);
+  protected modalStateId = '';
+  protected modalAttendedById = '';
+  protected modalCommentary = '';
+  private routeLine?: L.Polyline;
 
   // Personnel counters
   protected readonly availablePersonnel = computed(() => {
@@ -439,6 +606,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.clearRoute();
     this.subs.unsubscribe();
     this.personnelMarkers.clear();
     if (this.map) {
@@ -503,6 +671,15 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
       this.personnelLayer.addLayer(marker);
       this.personnelMarkers.set(userId, marker);
     }
+
+    // Update active route if tracing to this officer
+    if (this.isRoutingActive() && this.routeLine && this.selectedAlert()) {
+      const cur = this.selectedAlert()!;
+      const officerId = cur.attendedById || cur.attendedBy?.id;
+      if (officerId === userId) {
+        this.routeLine.setLatLngs([coords, [cur.latitude, cur.longitude]]);
+      }
+    }
   }
 
   private removePersonnelMarker(userId: string): void {
@@ -510,6 +687,11 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     if (marker && this.personnelLayer) {
       this.personnelLayer.removeLayer(marker);
       this.personnelMarkers.delete(userId);
+    }
+    const cur = this.selectedAlert();
+    const officerId = cur?.attendedById || cur?.attendedBy?.id;
+    if (this.isRoutingActive() && officerId === userId) {
+      this.clearRoute();
     }
   }
 
@@ -592,6 +774,128 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
       this.map.flyTo(this.TACNA_CENTER, 13, { duration: 1.2 });
     }
     this.updateMarkers();
+  }
+
+  openDelegateModal(alert: Alert): void {
+    const processState = this.alertsService.states().find((s) => s.name.toLowerCase().includes('proceso'));
+    this.openManageModal(alert, processState?.id);
+  }
+
+  openManageModal(alert: Alert, preselectedStateId?: string): void {
+    this.managingAlert.set(alert);
+    this.modalStateId = preselectedStateId || alert.stateId || alert.state?.id || '';
+    this.modalAttendedById = alert.attendedById || alert.attendedBy?.id || '';
+    this.modalCommentary = alert.commentary || '';
+  }
+
+  closeManageModal(): void {
+    this.managingAlert.set(null);
+  }
+
+  saveAlertChanges(): void {
+    const alert = this.managingAlert();
+    if (!alert) return;
+
+    this.isSavingAlert.set(true);
+    const payload = {
+      stateId: this.modalStateId,
+      state: this.modalStateId,
+      attendedById: this.modalAttendedById || undefined,
+      attendedBy: this.modalAttendedById || undefined,
+      commentary: this.modalCommentary || undefined,
+    };
+
+    this.alertsService.updateAlert(alert.id, payload).subscribe({
+      next: (res) => {
+        this.isSavingAlert.set(false);
+        if (res.alerts) {
+          this.selectedAlert.set(res.alerts);
+        }
+        this.closeManageModal();
+      },
+      error: (err) => {
+        console.error('Error updating alert from map', err);
+        this.isSavingAlert.set(false);
+      },
+    });
+  }
+
+  rejectAlert(alert: Alert): void {
+    const cancelState = this.alertsService.states().find((s) => {
+      const n = s.name.toLowerCase();
+      return n.includes('rechazad') || n.includes('cancelad');
+    });
+
+    if (!cancelState) return;
+
+    if (
+      typeof window !== 'undefined' &&
+      window.confirm(`¿Está seguro que desea rechazar/cancelar la alerta #${alert.id.slice(-6).toUpperCase()}?`)
+    ) {
+      this.alertsService.updateAlert(alert.id, {
+        stateId: cancelState.id,
+        state: cancelState.id,
+        commentary: 'Cancelada desde el monitor de mapa',
+      }).subscribe({
+        next: (res) => {
+          if (res.alerts) {
+            this.selectedAlert.set(res.alerts);
+          }
+        },
+      });
+    }
+  }
+
+  toggleRouteToPersonnel(alert: Alert): void {
+    if (this.isRoutingActive()) {
+      this.clearRoute();
+      return;
+    }
+
+    const attendedId = alert.attendedById || alert.attendedBy?.id;
+    if (!attendedId) {
+      if (typeof window !== 'undefined') {
+        window.alert('Esta alerta aún no tiene personal de seguridad asignado.');
+      }
+      return;
+    }
+
+    const officerMarker = this.personnelMarkers.get(attendedId);
+    if (!officerMarker || !this.map) {
+      const officerName = alert.attendedBy
+        ? `${alert.attendedBy.name} ${alert.attendedBy.lastname ?? ''}`.trim()
+        : 'asignado';
+      if (typeof window !== 'undefined') {
+        window.alert(`El personal ${officerName} no cuenta con reporte GPS activo en el mapa en estos momentos.`);
+      }
+      return;
+    }
+
+    const officerLatLng = officerMarker.getLatLng();
+    const alertLatLng: L.LatLngTuple = [alert.latitude, alert.longitude];
+
+    this.clearRoute();
+
+    this.routeLine = L.polyline([officerLatLng, alertLatLng], {
+      color: '#009efb',
+      weight: 4,
+      dashArray: '8, 8',
+      opacity: 0.9,
+    }).addTo(this.map);
+
+    this.isRoutingActive.set(true);
+    this.map.fitBounds(L.latLngBounds([officerLatLng, alertLatLng]), {
+      padding: [70, 70],
+      maxZoom: 17,
+    });
+  }
+
+  clearRoute(): void {
+    if (this.routeLine) {
+      this.routeLine.remove();
+      this.routeLine = undefined;
+    }
+    this.isRoutingActive.set(false);
   }
 
   centerOnAlert(alert: Alert): void {
