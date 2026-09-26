@@ -16,8 +16,9 @@ import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import * as L from 'leaflet';
 import { RealtimeService } from '../../../../core/services/realtime.service.js';
-import type { Alert, AlertUserSummary } from '../../models/alert.model.js';
+import type { Alert, AlertAction, StateCode } from '../../models/alert.model.js';
 import { AlertsService } from '../../services/alerts.service.js';
+import { getAlertStateStyle } from '../../utils/alert-state-style.js';
 
 interface DistrictOption {
   id: string;
@@ -91,10 +92,10 @@ interface DistrictOption {
               class="w-full text-xs p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white"
             >
               <option value="all">Todas las alertas</option>
-              <option value="pendiente">Pendientes</option>
-              <option value="proceso">En proceso</option>
-              <option value="resuelta">Resueltas</option>
-              <option value="rechazada">Canceladas / Rechazadas</option>
+              <option value="PENDING">Pendientes</option>
+              <option value="IN_PROGRESS">En proceso</option>
+              <option value="RESOLVED">Resueltas</option>
+              <option value="REJECTED">Canceladas / Rechazadas</option>
             </select>
           </div>
 
@@ -149,9 +150,9 @@ interface DistrictOption {
           <div class="text-xs space-y-1.5">
             <button
               type="button"
-              (click)="setStateFilter(selectedStateFilter() === 'pendiente' ? 'all' : 'pendiente')"
+              (click)="setStateFilter(selectedStateFilter() === 'PENDING' ? 'all' : 'PENDING')"
               class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
-              [ngClass]="selectedStateFilter() === 'pendiente' ? 'bg-amber-50 border border-amber-200' : 'hover:bg-slate-50'"
+              [ngClass]="selectedStateFilter() === 'PENDING' ? 'bg-amber-50 border border-amber-200' : 'hover:bg-slate-50'"
             >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-amber-500"></span>
@@ -162,9 +163,9 @@ interface DistrictOption {
 
             <button
               type="button"
-              (click)="setStateFilter(selectedStateFilter() === 'proceso' ? 'all' : 'proceso')"
+              (click)="setStateFilter(selectedStateFilter() === 'IN_PROGRESS' ? 'all' : 'IN_PROGRESS')"
               class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
-              [ngClass]="selectedStateFilter() === 'proceso' ? 'bg-sky-50 border border-sky-200' : 'hover:bg-slate-50'"
+              [ngClass]="selectedStateFilter() === 'IN_PROGRESS' ? 'bg-sky-50 border border-sky-200' : 'hover:bg-slate-50'"
             >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-[#009efb]"></span>
@@ -175,9 +176,9 @@ interface DistrictOption {
 
             <button
               type="button"
-              (click)="setStateFilter(selectedStateFilter() === 'resuelta' ? 'all' : 'resuelta')"
+              (click)="setStateFilter(selectedStateFilter() === 'RESOLVED' ? 'all' : 'RESOLVED')"
               class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
-              [ngClass]="selectedStateFilter() === 'resuelta' ? 'bg-emerald-50 border border-emerald-200' : 'hover:bg-slate-50'"
+              [ngClass]="selectedStateFilter() === 'RESOLVED' ? 'bg-emerald-50 border border-emerald-200' : 'hover:bg-slate-50'"
             >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
@@ -188,9 +189,9 @@ interface DistrictOption {
 
             <button
               type="button"
-              (click)="setStateFilter(selectedStateFilter() === 'rechazada' ? 'all' : 'rechazada')"
+              (click)="setStateFilter(selectedStateFilter() === 'REJECTED' ? 'all' : 'REJECTED')"
               class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
-              [ngClass]="selectedStateFilter() === 'rechazada' ? 'bg-rose-50 border border-rose-200' : 'hover:bg-slate-50'"
+              [ngClass]="selectedStateFilter() === 'REJECTED' ? 'bg-rose-50 border border-rose-200' : 'hover:bg-slate-50'"
             >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-rose-500"></span>
@@ -220,6 +221,7 @@ interface DistrictOption {
         @if (selectedAlert() && isDetailOpen()) {
           @let alert = selectedAlert()!;
           @let stateName = getAlertStateName(alert);
+          @let stateCode = resolveStateCode(alert);
           <div class="fixed inset-0 z-40 bg-black/30" (click)="closeDetail()"></div>
           <aside class="fixed inset-y-0 right-0 z-40 bg-slate-50 shadow-2xl border-l border-slate-200 w-full max-w-lg xl:max-w-xl flex flex-col">
             <!-- Header -->
@@ -229,8 +231,8 @@ interface DistrictOption {
                   <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Detalle de alerta</p>
                   <h3 class="text-xl font-bold text-slate-800">#{{ alert.id.slice(-6).toUpperCase() }}</h3>
                   <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold" [ngClass]="getStateBadgeClass(stateName)">
-                      <span class="w-2 h-2 rounded-full" [ngClass]="getDotClass(stateName)"></span>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold" [ngClass]="getStateBadgeClass(stateCode)">
+                      <span class="w-2 h-2 rounded-full" [ngClass]="getDotClass(stateCode)"></span>
                       {{ stateName }}
                     </span>
                     <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
@@ -352,7 +354,7 @@ interface DistrictOption {
 
             <!-- Footer actions -->
             <footer class="bg-white border-t border-slate-200 px-6 py-4 space-y-2">
-              @if (stateName.toLowerCase().includes('pendiente')) {
+              @if (hasAction(alert, 'delegate')) {
                 <div class="flex gap-2">
                   <button
                     type="button"
@@ -361,33 +363,39 @@ interface DistrictOption {
                   >
                     Delegar / Atender
                   </button>
-                  <button
-                    type="button"
-                    (click)="rejectAlert(alert)"
-                    class="py-2.5 px-4 border border-rose-300 hover:bg-rose-50 text-rose-600 rounded text-sm font-semibold transition-colors cursor-pointer"
-                  >
-                    Rechazar
-                  </button>
+                  @if (hasAction(alert, 'reject')) {
+                    <button
+                      type="button"
+                      (click)="rejectAlert(alert)"
+                      class="py-2.5 px-4 border border-rose-300 hover:bg-rose-50 text-rose-600 rounded text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      Rechazar
+                    </button>
+                  }
                 </div>
-              } @else if (stateName.toLowerCase().includes('proceso')) {
+              } @else if (stateCode === 'IN_PROGRESS') {
                 <div class="flex gap-2">
-                  <button
-                    type="button"
-                    (click)="toggleRouteToPersonnel(alert)"
-                    class="flex-1 py-2.5 px-3 rounded text-sm font-semibold shadow-sm transition-colors text-white cursor-pointer"
-                    [ngClass]="isRoutingActive() ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-                  >
-                    {{ isRoutingActive() ? 'Ocultar Ruta' : 'Trazar Ruta' }}
-                  </button>
-                  <button
-                    type="button"
-                    (click)="openManageModal(alert)"
-                    class="flex-1 py-2.5 px-3 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded text-sm font-semibold shadow-sm transition-colors cursor-pointer"
-                  >
-                    Gestionar
-                  </button>
+                  @if (hasAttendedOfficer(alert)) {
+                    <button
+                      type="button"
+                      (click)="toggleRouteToPersonnel(alert)"
+                      class="flex-1 py-2.5 px-3 rounded text-sm font-semibold shadow-sm transition-colors text-white cursor-pointer"
+                      [ngClass]="isRoutingActive() ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                    >
+                      {{ isRoutingActive() ? 'Ocultar Ruta' : 'Trazar Ruta' }}
+                    </button>
+                  }
+                  @if (hasAction(alert, 'manage')) {
+                    <button
+                      type="button"
+                      (click)="openManageModal(alert)"
+                      class="flex-1 py-2.5 px-3 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+                    >
+                      Gestionar
+                    </button>
+                  }
                 </div>
-              } @else {
+              } @else if (hasAction(alert, 'manage')) {
                 <button
                   type="button"
                   (click)="openManageModal(alert)"
@@ -425,7 +433,7 @@ interface DistrictOption {
               <!-- Modal Header -->
               <div class="bg-[#1976d2] px-6 py-4 text-white flex items-center justify-between">
                 <h5 class="text-base font-bold">
-                  Gestionar Alerta #{{ managingAlert()!.id.slice(-6).toUpperCase() }}
+                  {{ modalMode() === 'delegate' ? 'Delegar' : 'Gestionar' }} Alerta #{{ managingAlert()!.id.slice(-6).toUpperCase() }}
                 </h5>
                 <button
                   type="button"
@@ -461,18 +469,20 @@ interface DistrictOption {
                   </p>
                 </div>
 
-                <!-- Update State -->
-                <div>
-                  <label class="block font-bold text-slate-700 mb-1">Estado de la Alerta:</label>
-                  <select
-                    [(ngModel)]="modalStateId"
-                    class="w-full p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white text-xs"
-                  >
-                    @for (st of alertsService.states(); track st.id) {
-                      <option [value]="st.id">{{ st.name }}</option>
-                    }
-                  </select>
-                </div>
+                <!-- Update State (generic manage mode only; delegate mode only assigns personnel) -->
+                @if (modalMode() === 'manage') {
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Estado de la Alerta:</label>
+                    <select
+                      [(ngModel)]="modalStateId"
+                      class="w-full p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white text-xs"
+                    >
+                      @for (st of alertsService.states(); track st.id) {
+                        <option [value]="st.id">{{ st.name }}</option>
+                      }
+                    </select>
+                  </div>
+                }
 
                 <!-- Assign Personnel -->
                 <div>
@@ -514,7 +524,7 @@ interface DistrictOption {
                 <button
                   type="button"
                   (click)="saveAlertChanges()"
-                  [disabled]="isSavingAlert()"
+                  [disabled]="isSavingAlert() || (modalMode() === 'delegate' && !modalAttendedById)"
                   class="px-4 py-2 bg-[#1976d2] hover:bg-[#1565c0] text-white font-semibold rounded text-xs disabled:opacity-50 cursor-pointer"
                 >
                   {{ isSavingAlert() ? 'Guardando...' : 'Guardar Cambios' }}
@@ -563,10 +573,11 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   protected readonly selectedDistrictId = signal<string>('');
-  protected readonly selectedStateFilter = signal<string>('all');
+  protected readonly selectedStateFilter = signal<'all' | StateCode>('all');
   protected readonly selectedAlert = signal<Alert | null>(null);
   protected readonly isDetailOpen = signal<boolean>(false);
   protected readonly managingAlert = signal<Alert | null>(null);
+  protected readonly modalMode = signal<'manage' | 'delegate'>('manage');
   protected readonly isSavingAlert = signal<boolean>(false);
   protected readonly isRoutingActive = signal<boolean>(false);
   protected modalStateId = '';
@@ -596,25 +607,11 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   // Filtered alerts for map display
   protected readonly displayedAlerts = computed(() => {
     const list = this.alertsService.alerts();
-    const filter = this.selectedStateFilter().toLowerCase();
+    const filter = this.selectedStateFilter();
 
     if (filter === 'all') return list;
 
-    return list.filter((a) => {
-      let stateName = a.state?.name?.toLowerCase() ?? '';
-      if (!stateName && a.stateId) {
-        const matched = this.alertsService.states().find((s) => s.id === a.stateId);
-        if (matched) {
-          stateName = matched.name.toLowerCase();
-        }
-      }
-
-      if (filter === 'pendiente') return stateName.includes('pendiente');
-      if (filter === 'proceso') return stateName.includes('proceso');
-      if (filter === 'resuelta') return stateName.includes('resuelt');
-      if (filter === 'rechazada') return stateName.includes('rechazad') || stateName.includes('cancelad');
-      return true;
-    });
+    return list.filter((a) => this.resolveStateCode(a) === filter);
   });
 
   ngOnInit(): void {
@@ -769,8 +766,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     for (const alert of alerts) {
       if (!alert.latitude || !alert.longitude) continue;
 
-      const stateName = this.getAlertStateName(alert);
-      const color = this.getMarkerColor(stateName);
+      const color = this.getMarkerColor(this.resolveStateCode(alert));
       const icon = L.divIcon({
         className: 'custom-map-pin',
         html: `
@@ -825,7 +821,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const state = document.createElement('p');
     state.className = 'font-semibold';
-    state.style.color = this.getMarkerColor(stateName);
+    state.style.color = this.getMarkerColor(this.resolveStateCode(alert));
     state.textContent = stateName;
 
     const user = document.createElement('p');
@@ -870,11 +866,11 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onStateFilterChange(event: Event): void {
     const target = event.target as HTMLSelectElement;
-    const value = target?.value ?? 'all';
+    const value = (target?.value ?? 'all') as 'all' | StateCode;
     this.setStateFilter(value);
   }
 
-  setStateFilter(filter: string): void {
+  setStateFilter(filter: 'all' | StateCode): void {
     this.selectedStateFilter.set(filter);
     this.updateMarkers();
   }
@@ -891,31 +887,54 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   openDelegateModal(alert: Alert): void {
-    const processState = this.alertsService.states().find((s) => s.name.toLowerCase().includes('proceso'));
-    this.openManageModal(alert, processState?.id);
+    this.managingAlert.set(alert);
+    this.modalMode.set('delegate');
+    this.modalAttendedById = alert.attendedById || alert.attendedBy?.id || '';
+    this.modalCommentary = alert.commentary || '';
   }
 
-  openManageModal(alert: Alert, preselectedStateId?: string): void {
+  openManageModal(alert: Alert): void {
     this.managingAlert.set(alert);
-    this.modalStateId = preselectedStateId || alert.stateId || alert.state?.id || '';
+    this.modalMode.set('manage');
+    this.modalStateId = alert.stateId || alert.state?.id || '';
     this.modalAttendedById = alert.attendedById || alert.attendedBy?.id || '';
     this.modalCommentary = alert.commentary || '';
   }
 
   closeManageModal(): void {
     this.managingAlert.set(null);
+    this.modalMode.set('manage');
   }
 
   saveAlertChanges(): void {
     const alert = this.managingAlert();
     if (!alert) return;
 
+    if (this.modalMode() === 'delegate') {
+      if (!this.modalAttendedById) return;
+      this.isSavingAlert.set(true);
+      this.alertsService
+        .delegateAlert(alert.id, this.modalAttendedById, this.modalCommentary || undefined)
+        .subscribe({
+          next: (res) => {
+            this.isSavingAlert.set(false);
+            if (res.alerts) {
+              this.selectedAlert.set(res.alerts);
+            }
+            this.closeManageModal();
+          },
+          error: (err) => {
+            console.error('Error delegating alert from map', err);
+            this.isSavingAlert.set(false);
+          },
+        });
+      return;
+    }
+
     this.isSavingAlert.set(true);
     const payload = {
       stateId: this.modalStateId,
-      state: this.modalStateId,
       attendedById: this.modalAttendedById || undefined,
-      attendedBy: this.modalAttendedById || undefined,
       commentary: this.modalCommentary || undefined,
     };
 
@@ -935,22 +954,11 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   rejectAlert(alert: Alert): void {
-    const cancelState = this.alertsService.states().find((s) => {
-      const n = s.name.toLowerCase();
-      return n.includes('rechazad') || n.includes('cancelad');
-    });
-
-    if (!cancelState) return;
-
     if (
       typeof window !== 'undefined' &&
       window.confirm(`¿Está seguro que desea rechazar/cancelar la alerta #${alert.id.slice(-6).toUpperCase()}?`)
     ) {
-      this.alertsService.updateAlert(alert.id, {
-        stateId: cancelState.id,
-        state: cancelState.id,
-        commentary: 'Cancelada desde el monitor de mapa',
-      }).subscribe({
+      this.alertsService.rejectAlert(alert.id, 'Cancelada desde el monitor de mapa').subscribe({
         next: (res) => {
           if (res.alerts) {
             this.selectedAlert.set(res.alerts);
@@ -1018,6 +1026,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /** Display name only; id-based catalog fallback, never name matching. */
   protected getAlertStateName(alert: Alert): string {
     if (alert.state?.name) return alert.state.name;
     if (alert.stateId) {
@@ -1027,30 +1036,34 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     return 'Sin estado';
   }
 
-  private getMarkerColor(stateName?: string): string {
-    const s = stateName?.toLowerCase() ?? '';
-    if (s.includes('pendiente')) return '#ffb22b';
-    if (s.includes('proceso')) return '#009efb';
-    if (s.includes('resuelt')) return '#26c6da';
-    if (s.includes('rechazad') || s.includes('cancelad')) return '#ef5350';
-    return '#745af2';
+  /** Resolves the alert's StateCode from the populated relation or, failing
+   * that, an id lookup against the state catalog. Never inspects the name. */
+  protected resolveStateCode(alert: Alert): StateCode | undefined {
+    if (alert.state?.code) return alert.state.code;
+    if (alert.stateId) {
+      const matched = this.alertsService.states().find((s) => s.id === alert.stateId);
+      return matched?.code;
+    }
+    return undefined;
   }
 
-  getStateBadgeClass(stateName?: string): string {
-    const s = stateName?.toLowerCase() ?? '';
-    if (s.includes('pendiente')) return 'bg-amber-50 text-amber-700';
-    if (s.includes('proceso')) return 'bg-sky-50 text-sky-700';
-    if (s.includes('resuelt')) return 'bg-emerald-50 text-emerald-700';
-    if (s.includes('rechazad') || s.includes('cancelad')) return 'bg-rose-50 text-rose-600';
-    return 'bg-slate-100 text-slate-600';
+  protected hasAction(alert: Alert, action: AlertAction): boolean {
+    return (alert.allowedActions ?? []).includes(action);
   }
 
-  getDotClass(stateName?: string): string {
-    const s = stateName?.toLowerCase() ?? '';
-    if (s.includes('pendiente')) return 'bg-amber-500';
-    if (s.includes('proceso')) return 'bg-sky-500';
-    if (s.includes('resuelt')) return 'bg-emerald-500';
-    if (s.includes('rechazad') || s.includes('cancelad')) return 'bg-rose-500';
-    return 'bg-slate-400';
+  protected hasAttendedOfficer(alert: Alert): boolean {
+    return Boolean(alert.attendedById || alert.attendedBy?.id);
+  }
+
+  private getMarkerColor(code?: StateCode): string {
+    return getAlertStateStyle(code).markerColor;
+  }
+
+  getStateBadgeClass(code?: StateCode): string {
+    return getAlertStateStyle(code).badgeClass;
+  }
+
+  getDotClass(code?: StateCode): string {
+    return getAlertStateStyle(code).dotClass;
   }
 }

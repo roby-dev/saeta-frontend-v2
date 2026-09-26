@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { environment } from '../../../../../environments/environment.js';
 import type { Alert } from '../../models/alert.model.js';
 import { AlertsService } from '../../services/alerts.service.js';
@@ -32,8 +32,11 @@ describe('AlertsMapComponent', () => {
       typeId: 'type-1',
       stateId: 'state-pending',
       creationDate: '2026-09-19T12:00:00.000Z',
-      state: { id: 'state-pending', name: 'Pendiente' },
+      // Renamed state ('Pendiente' -> 'En espera') proves rendering follows
+      // the code, not the name.
+      state: { id: 'state-pending', name: 'En espera', code: 'PENDING' },
       type: { id: 'type-1', name: 'Robo' },
+      allowedActions: ['delegate', 'reject', 'manage'],
     },
     {
       id: 'alert-2',
@@ -43,8 +46,9 @@ describe('AlertsMapComponent', () => {
       typeId: 'type-2',
       stateId: 'state-process',
       creationDate: '2026-09-19T13:00:00.000Z',
-      state: { id: 'state-process', name: 'En proceso' },
+      state: { id: 'state-process', name: 'En proceso', code: 'IN_PROGRESS' },
       type: { id: 'type-2', name: 'Accidente' },
+      allowedActions: ['reject', 'manage'],
     },
     {
       id: 'alert-3',
@@ -54,7 +58,8 @@ describe('AlertsMapComponent', () => {
       typeId: 'type-1',
       stateId: 'state-resolved',
       creationDate: '2026-09-19T14:00:00.000Z',
-      state: { id: 'state-resolved', name: 'Resuelta' },
+      state: { id: 'state-resolved', name: 'Resuelta', code: 'RESOLVED' },
+      allowedActions: ['manage'],
     },
     {
       id: 'alert-4',
@@ -65,6 +70,7 @@ describe('AlertsMapComponent', () => {
       stateId: 'state-cancelled',
       creationDate: '2026-09-19T15:00:00.000Z',
       // Testing unpopulated state relation with catalog fallback
+      allowedActions: ['manage'],
     },
   ];
 
@@ -118,10 +124,10 @@ describe('AlertsMapComponent', () => {
     reqStates.flush({
       ok: true,
       states: [
-        { id: 'state-pending', name: 'Pendiente' },
-        { id: 'state-process', name: 'En proceso' },
-        { id: 'state-resolved', name: 'Resuelta' },
-        { id: 'state-cancelled', name: 'Cancelada' },
+        { id: 'state-pending', name: 'En espera', code: 'PENDING' },
+        { id: 'state-process', name: 'En proceso', code: 'IN_PROGRESS' },
+        { id: 'state-resolved', name: 'Resuelta', code: 'RESOLVED' },
+        { id: 'state-cancelled', name: 'Cancelada', code: 'REJECTED' },
       ],
     });
 
@@ -151,49 +157,49 @@ describe('AlertsMapComponent', () => {
     expect(component['displayedAlerts']().length).toBe(4);
   });
 
-  it('should filter alerts reactively when selectedStateFilter is set to pendiente', () => {
+  it('should filter alerts reactively when selectedStateFilter is set to PENDING', () => {
     flushInitRequests();
 
-    component.setStateFilter('pendiente');
+    component.setStateFilter('PENDING');
     fixture.detectChanges();
 
-    expect(component['selectedStateFilter']()).toBe('pendiente');
+    expect(component['selectedStateFilter']()).toBe('PENDING');
     const filtered = component['displayedAlerts']();
     expect(filtered.length).toBe(1);
     expect(filtered[0].id).toBe('alert-1');
   });
 
-  it('should filter alerts reactively when selectedStateFilter is set to proceso', () => {
+  it('should filter alerts reactively when selectedStateFilter is set to IN_PROGRESS', () => {
     flushInitRequests();
 
-    component.setStateFilter('proceso');
+    component.setStateFilter('IN_PROGRESS');
     fixture.detectChanges();
 
-    expect(component['selectedStateFilter']()).toBe('proceso');
+    expect(component['selectedStateFilter']()).toBe('IN_PROGRESS');
     const filtered = component['displayedAlerts']();
     expect(filtered.length).toBe(1);
     expect(filtered[0].id).toBe('alert-2');
   });
 
-  it('should filter alerts reactively when selectedStateFilter is set to resuelta', () => {
+  it('should filter alerts reactively when selectedStateFilter is set to RESOLVED', () => {
     flushInitRequests();
 
-    component.setStateFilter('resuelta');
+    component.setStateFilter('RESOLVED');
     fixture.detectChanges();
 
-    expect(component['selectedStateFilter']()).toBe('resuelta');
+    expect(component['selectedStateFilter']()).toBe('RESOLVED');
     const filtered = component['displayedAlerts']();
     expect(filtered.length).toBe(1);
     expect(filtered[0].id).toBe('alert-3');
   });
 
-  it('should filter alerts reactively when selectedStateFilter is set to rechazada/cancelada using catalog fallback', () => {
+  it('should filter alerts reactively when selectedStateFilter is set to REJECTED using catalog fallback', () => {
     flushInitRequests();
 
-    component.setStateFilter('rechazada');
+    component.setStateFilter('REJECTED');
     fixture.detectChanges();
 
-    expect(component['selectedStateFilter']()).toBe('rechazada');
+    expect(component['selectedStateFilter']()).toBe('REJECTED');
     const filtered = component['displayedAlerts']();
     expect(filtered.length).toBe(1);
     expect(filtered[0].id).toBe('alert-4');
@@ -202,7 +208,7 @@ describe('AlertsMapComponent', () => {
   it('should reset filters when resetMapFilters is called', () => {
     flushInitRequests();
 
-    component.setStateFilter('pendiente');
+    component.setStateFilter('PENDING');
     component['selectedDistrictId'].set('tacna');
     expect(component['displayedAlerts']().length).toBe(1);
 
@@ -215,8 +221,16 @@ describe('AlertsMapComponent', () => {
   it('should resolve alert state name accurately with populated and unpopulated relations', () => {
     flushInitRequests();
 
-    expect(component['getAlertStateName'](mockAlerts[0])).toBe('Pendiente');
+    expect(component['getAlertStateName'](mockAlerts[0])).toBe('En espera');
     expect(component['getAlertStateName'](mockAlerts[3])).toBe('Cancelada');
+  });
+
+  it('should resolve alert state code from populated relation or catalog fallback by id (never by name)', () => {
+    flushInitRequests();
+
+    expect(component['resolveStateCode'](mockAlerts[0])).toBe('PENDING');
+    // alert-4 has no populated `state`, resolved purely via stateId -> catalog code
+    expect(component['resolveStateCode'](mockAlerts[3])).toBe('REJECTED');
   });
 
   it('should handle realtime personnel location updates and disconnection', () => {
@@ -259,7 +273,7 @@ describe('AlertsMapComponent', () => {
 
     const popup = component['buildPopupContent'](mockAlerts[0]);
     expect(popup.textContent).toContain('Robo');
-    expect(popup.textContent).toContain('Pendiente');
+    expect(popup.textContent).toContain('En espera');
 
     const button = popup.querySelector('button');
     expect(button?.textContent).toContain('Ver más');
@@ -269,12 +283,15 @@ describe('AlertsMapComponent', () => {
     expect(component['isDetailOpen']()).toBe(true);
   });
 
-  it('should map state names to side sheet badge classes', () => {
-    expect(component.getStateBadgeClass('Pendiente')).toContain('amber');
-    expect(component.getStateBadgeClass('En proceso')).toContain('sky');
-    expect(component.getStateBadgeClass('Resuelta')).toContain('emerald');
-    expect(component.getStateBadgeClass('Cancelada')).toContain('rose');
-    expect(component.getStateBadgeClass('Sin estado')).toContain('slate');
+  it('should map state codes to side sheet badge/dot classes, independent of the state name', () => {
+    expect(component.getStateBadgeClass('PENDING')).toContain('amber');
+    expect(component.getStateBadgeClass('IN_PROGRESS')).toContain('sky');
+    expect(component.getStateBadgeClass('RESOLVED')).toContain('emerald');
+    expect(component.getStateBadgeClass('REJECTED')).toContain('rose');
+    expect(component.getStateBadgeClass(undefined)).toContain('slate');
+
+    expect(component.getDotClass('PENDING')).toContain('amber');
+    expect(component.getDotClass(undefined)).toContain('slate');
   });
 
   it('should close the detail side sheet and clear selection', () => {
@@ -288,15 +305,62 @@ describe('AlertsMapComponent', () => {
     expect(component['selectedAlert']()).toBeNull();
   });
 
-  it('should open delegate modal with process state preselected', () => {
+  it('should expose which actions a renamed-but-still-PENDING alert allows, from allowedActions only', () => {
+    flushInitRequests();
+
+    // mockAlerts[0] carries name 'En espera' (not 'Pendiente') but code PENDING
+    // and allowedActions ['delegate', 'reject', 'manage'] from the backend.
+    expect(component['hasAction'](mockAlerts[0], 'delegate')).toBe(true);
+    expect(component['hasAction'](mockAlerts[0], 'reject')).toBe(true);
+    expect(component['hasAction'](mockAlerts[2], 'delegate')).toBe(false);
+  });
+
+  it('should open the manage modal in delegate mode without preselecting a state', () => {
     flushInitRequests();
 
     component.openDelegateModal(mockAlerts[0]);
     expect(component['managingAlert']()).toEqual(mockAlerts[0]);
-    expect(component['modalStateId']).toBe('state-process');
+    expect(component['modalMode']()).toBe('delegate');
   });
 
-  it('should save alert changes and update selected alert', () => {
+  it('should delegate an alert to the selected officer and update the selected alert', () => {
+    flushInitRequests();
+
+    component.openDelegateModal(mockAlerts[0]);
+    component['modalAttendedById'] = 'officer-1';
+    component['modalCommentary'] = 'Atendiendo';
+
+    component.saveAlertChanges();
+
+    const reqPost = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1/delegate`);
+    expect(reqPost.request.method).toBe('POST');
+    expect(reqPost.request.body).toEqual({ attendedById: 'officer-1', commentary: 'Atendiendo' });
+    const delegated: Alert = {
+      ...mockAlerts[0],
+      attendedById: 'officer-1',
+      state: { id: 'state-process', name: 'En proceso', code: 'IN_PROGRESS' },
+    };
+    reqPost.flush({ ok: true, alerts: delegated });
+
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqReload.flush({ ok: true, alerts: [delegated] });
+
+    expect(component['managingAlert']()).toBeNull();
+    expect(component['selectedAlert']()?.attendedById).toBe('officer-1');
+  });
+
+  it('should not delegate when no officer is selected', () => {
+    flushInitRequests();
+
+    component.openDelegateModal(mockAlerts[0]);
+    component['modalAttendedById'] = '';
+
+    component.saveAlertChanges();
+
+    httpMock.expectNone(`${environment.apiUrl}/alerts/alert-1/delegate`);
+  });
+
+  it('should save alert changes (generic manage) sending only stateId/attendedById/commentary', () => {
     flushInitRequests();
 
     component.openManageModal(mockAlerts[0]);
@@ -307,6 +371,11 @@ describe('AlertsMapComponent', () => {
 
     const reqPut = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1`);
     expect(reqPut.request.method).toBe('PUT');
+    expect(reqPut.request.body).toEqual({
+      stateId: 'state-resolved',
+      attendedById: undefined,
+      commentary: 'Atendido en mapa',
+    });
     const updated: Alert = { ...mockAlerts[0], stateId: 'state-resolved' };
     reqPut.flush({ ok: true, alerts: updated });
 
@@ -316,6 +385,37 @@ describe('AlertsMapComponent', () => {
 
     expect(component['managingAlert']()).toBeNull();
     expect(component['selectedAlert']()?.stateId).toBe('state-resolved');
+  });
+
+  it('should reject an alert via the dedicated endpoint when confirmed', () => {
+    flushInitRequests();
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    component.rejectAlert(mockAlerts[0]);
+
+    const reqPost = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1/reject`);
+    expect(reqPost.request.method).toBe('POST');
+    const rejected: Alert = {
+      ...mockAlerts[0],
+      state: { id: 'state-cancelled', name: 'Cancelada', code: 'REJECTED' },
+    };
+    reqPost.flush({ ok: true, alerts: rejected });
+
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqReload.flush({ ok: true, alerts: [rejected] });
+
+    expect(component['selectedAlert']()?.state?.code).toBe('REJECTED');
+  });
+
+  it('should not reject an alert when the confirmation is dismissed', () => {
+    flushInitRequests();
+
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    component.rejectAlert(mockAlerts[0]);
+
+    httpMock.expectNone(`${environment.apiUrl}/alerts/alert-1/reject`);
   });
 
   it('should toggle and clear route to personnel on the map', () => {
