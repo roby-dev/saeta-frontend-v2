@@ -218,119 +218,171 @@ interface DistrictOption {
 
         <!-- Selected Alert Detail Side Sheet -->
         @if (selectedAlert() && isDetailOpen()) {
+          @let alert = selectedAlert()!;
+          @let stateName = getAlertStateName(alert);
           <div class="fixed inset-0 z-40 bg-black/30" (click)="closeDetail()"></div>
-          <aside class="fixed inset-y-0 right-0 z-40 bg-white shadow-2xl border-l border-slate-200 p-5 w-full max-w-md overflow-y-auto">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div class="flex items-center gap-2">
-                <span
-                  class="w-3 h-3 rounded-full"
-                  [ngClass]="getDotClass(getAlertStateName(selectedAlert()!))"
-                ></span>
-                <span class="font-bold text-sm text-slate-800">
-                  Alerta #{{ selectedAlert()!.id.slice(-6).toUpperCase() }}
-                </span>
+          <aside class="fixed inset-y-0 right-0 z-40 bg-slate-50 shadow-2xl border-l border-slate-200 w-full max-w-lg xl:max-w-xl flex flex-col">
+            <!-- Header -->
+            <header class="bg-white border-b border-slate-200 px-6 py-5">
+              <div class="flex items-start justify-between gap-4">
+                <div class="space-y-1.5">
+                  <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Detalle de alerta</p>
+                  <h3 class="text-xl font-bold text-slate-800">#{{ alert.id.slice(-6).toUpperCase() }}</h3>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold" [ngClass]="getStateBadgeClass(stateName)">
+                      <span class="w-2 h-2 rounded-full" [ngClass]="getDotClass(stateName)"></span>
+                      {{ stateName }}
+                    </span>
+                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                      {{ alert.type?.name || 'Emergencia' }}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  (click)="closeDetail()"
+                  class="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 text-lg cursor-pointer"
+                  aria-label="Cerrar detalle"
+                >
+                  ✕
+                </button>
               </div>
-              <button
-                type="button"
-                (click)="closeDetail()"
-                class="text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
-              >
-                ✕
-              </button>
+            </header>
+
+            <!-- Body -->
+            <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4 text-sm text-slate-600">
+              <!-- Citizen -->
+              <section class="bg-white rounded-lg border border-slate-200 p-4">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Ciudadano</h4>
+                <div class="flex items-center gap-3 mb-4">
+                  @if (alert.user?.image) {
+                    <img [src]="alert.user!.image" alt="" class="w-12 h-12 rounded-full object-cover" />
+                  } @else {
+                    <div class="w-12 h-12 rounded-full bg-[#1976d2] text-white flex items-center justify-center font-bold">
+                      {{ alert.user?.name?.charAt(0) || 'C' }}
+                    </div>
+                  }
+                  <div>
+                    <p class="font-bold text-slate-800">{{ alert.user?.name }} {{ alert.user?.lastname }}</p>
+                    <p class="text-xs text-slate-400">DNI {{ alert.user?.dni || 'S/D' }}</p>
+                  </div>
+                </div>
+                <dl class="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <dt class="text-slate-400">Teléfono</dt>
+                    <dd class="font-semibold text-slate-700">
+                      @if (alert.user?.phone) {
+                        <a [href]="'tel:' + alert.user!.phone" class="text-blue-600 hover:underline">{{ alert.user!.phone }}</a>
+                      } @else {
+                        S/D
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-slate-400">Correo</dt>
+                    <dd class="font-semibold text-slate-700 truncate">{{ alert.user?.email || 'S/D' }}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <!-- Timeline -->
+              <section class="bg-white rounded-lg border border-slate-200 p-4">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Línea de tiempo</h4>
+                <ol class="relative border-l-2 border-slate-200 ml-1.5 space-y-4 text-xs">
+                  <li class="pl-4 relative">
+                    <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-amber-500 ring-2 ring-white"></span>
+                    <p class="font-semibold text-slate-700">Alerta creada</p>
+                    <p class="text-slate-400">{{ (alert.createdAt || alert.creationDate) | date: 'dd/MM/yyyy HH:mm' }}</p>
+                  </li>
+                  <li class="pl-4 relative">
+                    <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full ring-2 ring-white" [ngClass]="alert.attentionDate ? 'bg-sky-500' : 'bg-slate-300'"></span>
+                    <p class="font-semibold" [ngClass]="alert.attentionDate ? 'text-slate-700' : 'text-slate-400'">En atención</p>
+                    <p class="text-slate-400">{{ alert.attentionDate ? (alert.attentionDate | date: 'dd/MM/yyyy HH:mm') : 'Pendiente' }}</p>
+                  </li>
+                  <li class="pl-4 relative">
+                    <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full ring-2 ring-white" [ngClass]="alert.culminationDate ? 'bg-emerald-500' : 'bg-slate-300'"></span>
+                    <p class="font-semibold" [ngClass]="alert.culminationDate ? 'text-slate-700' : 'text-slate-400'">Culminada</p>
+                    <p class="text-slate-400">{{ alert.culminationDate ? (alert.culminationDate | date: 'dd/MM/yyyy HH:mm') : 'Pendiente' }}</p>
+                  </li>
+                </ol>
+              </section>
+
+              <!-- Location -->
+              <section class="bg-white rounded-lg border border-slate-200 p-4">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Ubicación</h4>
+                <dl class="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <dt class="text-slate-400">Latitud</dt>
+                    <dd class="font-mono font-semibold text-slate-700">{{ alert.latitude | number: '1.6-6' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-slate-400">Longitud</dt>
+                    <dd class="font-mono font-semibold text-slate-700">{{ alert.longitude | number: '1.6-6' }}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <!-- Attention -->
+              <section class="bg-white rounded-lg border border-slate-200 p-4">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Atención</h4>
+                @if (alert.attendedBy) {
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+                      {{ alert.attendedBy.name.charAt(0) }}
+                    </div>
+                    <div>
+                      <p class="font-semibold text-slate-800">{{ alert.attendedBy.name }} {{ alert.attendedBy.lastname }}</p>
+                      <p class="text-xs text-slate-400">{{ alert.attendedBy.role || 'Personal de seguridad' }}</p>
+                    </div>
+                  </div>
+                } @else {
+                  <p class="text-xs text-slate-400">Sin personal asignado.</p>
+                }
+
+                @if (alert.score) {
+                  <p class="mt-3 text-amber-500 font-bold text-sm">★ {{ alert.score }} / 5</p>
+                }
+                @if (alert.commentary) {
+                  <p class="mt-3 text-xs text-slate-600 italic bg-slate-50 p-3 rounded border border-slate-200">
+                    "{{ alert.commentary }}"
+                  </p>
+                }
+              </section>
             </div>
 
-            <div class="py-3 space-y-2 text-xs text-slate-600">
-              <p>
-                <b class="text-slate-700">Ciudadano:</b>
-                {{ selectedAlert()!.user?.name }} {{ selectedAlert()!.user?.lastname }}
-              </p>
-              <p>
-                <b class="text-slate-700">DNI:</b>
-                {{ selectedAlert()!.user?.dni || 'S/D' }}
-              </p>
-              @if (selectedAlert()!.user?.phone) {
-                <p>
-                  <b class="text-slate-700">Teléfono:</b>
-                  <a [href]="'tel:' + selectedAlert()!.user?.phone" class="text-blue-600 font-semibold underline">
-                    {{ selectedAlert()!.user?.phone }}
-                  </a>
-                </p>
-              }
-              <p>
-                <b class="text-slate-700">Incidente:</b>
-                {{ selectedAlert()!.type?.name || 'Emergencia' }}
-              </p>
-              <p>
-                <b class="text-slate-700">Estado:</b>
-                <span class="font-semibold ml-1" [ngClass]="{
-                  'text-amber-600': getAlertStateName(selectedAlert()!).toLowerCase().includes('pendiente'),
-                  'text-[#009efb]': getAlertStateName(selectedAlert()!).toLowerCase().includes('proceso'),
-                  'text-emerald-600': getAlertStateName(selectedAlert()!).toLowerCase().includes('resuelt'),
-                  'text-rose-500': getAlertStateName(selectedAlert()!).toLowerCase().includes('rechazad') || getAlertStateName(selectedAlert()!).toLowerCase().includes('cancelad')
-                }">
-                  {{ getAlertStateName(selectedAlert()!) }}
-                </span>
-              </p>
-              <p>
-                <b class="text-slate-700">Fecha:</b>
-                {{ selectedAlert()!.createdAt ? (selectedAlert()!.createdAt | date: 'dd/MM/yyyy HH:mm') : selectedAlert()!.creationDate }}
-              </p>
-              <p>
-                <b class="text-slate-700">Ubicación GPS:</b>
-                <span class="font-mono text-[11px]">{{ selectedAlert()!.latitude }}, {{ selectedAlert()!.longitude }}</span>
-              </p>
-
-              @if (selectedAlert()!.attendedBy) {
-                <p>
-                  <b class="text-slate-700">Atendido por:</b>
-                  {{ selectedAlert()!.attendedBy?.name }} {{ selectedAlert()!.attendedBy?.lastname }}
-                </p>
-              }
-              @if (selectedAlert()!.score) {
-                <p class="text-amber-500 font-bold">
-                  <b>Calificación:</b> ★ {{ selectedAlert()!.score }} / 5
-                </p>
-              }
-              @if (selectedAlert()!.commentary) {
-                <p class="text-slate-500 italic bg-amber-50/60 p-1.5 rounded border border-amber-200">
-                  "{{ selectedAlert()!.commentary }}"
-                </p>
-              }
-            </div>
-
-            <!-- Action Buttons based on Alert State -->
-            <div class="pt-2.5 mt-1 border-t border-slate-100 flex flex-col gap-1.5">
-              @if (getAlertStateName(selectedAlert()!).toLowerCase().includes('pendiente')) {
+            <!-- Footer actions -->
+            <footer class="bg-white border-t border-slate-200 px-6 py-4 space-y-2">
+              @if (stateName.toLowerCase().includes('pendiente')) {
                 <div class="flex gap-2">
                   <button
                     type="button"
-                    (click)="openDelegateModal(selectedAlert()!)"
-                    class="flex-1 py-1.5 px-2 bg-[#009efb] hover:bg-[#0088db] text-white rounded text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                    (click)="openDelegateModal(alert)"
+                    class="flex-1 py-2.5 px-3 bg-[#009efb] hover:bg-[#0088db] text-white rounded text-sm font-semibold shadow-sm transition-colors cursor-pointer"
                   >
-                    <span>Delegar / Atender</span>
+                    Delegar / Atender
                   </button>
                   <button
                     type="button"
-                    (click)="rejectAlert(selectedAlert()!)"
-                    class="py-1.5 px-3 border border-rose-300 hover:bg-rose-50 text-rose-600 rounded text-xs font-semibold transition-colors cursor-pointer"
+                    (click)="rejectAlert(alert)"
+                    class="py-2.5 px-4 border border-rose-300 hover:bg-rose-50 text-rose-600 rounded text-sm font-semibold transition-colors cursor-pointer"
                   >
                     Rechazar
                   </button>
                 </div>
-              } @else if (getAlertStateName(selectedAlert()!).toLowerCase().includes('proceso')) {
+              } @else if (stateName.toLowerCase().includes('proceso')) {
                 <div class="flex gap-2">
                   <button
                     type="button"
-                    (click)="toggleRouteToPersonnel(selectedAlert()!)"
-                    class="flex-1 py-1.5 px-2 rounded text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1 text-white cursor-pointer"
+                    (click)="toggleRouteToPersonnel(alert)"
+                    class="flex-1 py-2.5 px-3 rounded text-sm font-semibold shadow-sm transition-colors text-white cursor-pointer"
                     [ngClass]="isRoutingActive() ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
                   >
-                    <span>{{ isRoutingActive() ? 'Ocultar Ruta' : 'Trazar Ruta' }}</span>
+                    {{ isRoutingActive() ? 'Ocultar Ruta' : 'Trazar Ruta' }}
                   </button>
                   <button
                     type="button"
-                    (click)="openManageModal(selectedAlert()!)"
-                    class="flex-1 py-1.5 px-2 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                    (click)="openManageModal(alert)"
+                    class="flex-1 py-2.5 px-3 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded text-sm font-semibold shadow-sm transition-colors cursor-pointer"
                   >
                     Gestionar
                   </button>
@@ -338,31 +390,31 @@ interface DistrictOption {
               } @else {
                 <button
                   type="button"
-                  (click)="openManageModal(selectedAlert()!)"
-                  class="w-full py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold transition-colors cursor-pointer"
+                  (click)="openManageModal(alert)"
+                  class="w-full py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Ver / Modificar Alerta
                 </button>
               }
 
-              <!-- Navigation & Focus Row -->
-              <div class="flex gap-2 pt-1">
+              <div class="flex gap-2">
                 <button
                   type="button"
-                  (click)="centerOnAlert(selectedAlert()!)"
-                  class="flex-1 text-center py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                  (click)="centerOnAlert(alert)"
+                  class="flex-1 py-2.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Enfocar
                 </button>
                 <a
-                  [href]="'https://www.google.com/maps?q=' + selectedAlert()!.latitude + ',' + selectedAlert()!.longitude"
+                  [href]="'https://www.google.com/maps?q=' + alert.latitude + ',' + alert.longitude"
                   target="_blank"
-                  class="flex-1 text-center py-1.5 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white text-xs font-semibold transition-colors"
+                  rel="noopener"
+                  class="flex-1 text-center py-2.5 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white text-sm font-semibold transition-colors"
                 >
                   Navegar GPS ↗
                 </a>
               </div>
-            </div>
+            </footer>
           </aside>
         }
 
@@ -982,6 +1034,15 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     if (s.includes('resuelt')) return '#26c6da';
     if (s.includes('rechazad') || s.includes('cancelad')) return '#ef5350';
     return '#745af2';
+  }
+
+  getStateBadgeClass(stateName?: string): string {
+    const s = stateName?.toLowerCase() ?? '';
+    if (s.includes('pendiente')) return 'bg-amber-50 text-amber-700';
+    if (s.includes('proceso')) return 'bg-sky-50 text-sky-700';
+    if (s.includes('resuelt')) return 'bg-emerald-50 text-emerald-700';
+    if (s.includes('rechazad') || s.includes('cancelad')) return 'bg-rose-50 text-rose-600';
+    return 'bg-slate-100 text-slate-600';
   }
 
   getDotClass(stateName?: string): string {

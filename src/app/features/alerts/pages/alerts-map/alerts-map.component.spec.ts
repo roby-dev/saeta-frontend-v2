@@ -269,6 +269,14 @@ describe('AlertsMapComponent', () => {
     expect(component['isDetailOpen']()).toBe(true);
   });
 
+  it('should map state names to side sheet badge classes', () => {
+    expect(component.getStateBadgeClass('Pendiente')).toContain('amber');
+    expect(component.getStateBadgeClass('En proceso')).toContain('sky');
+    expect(component.getStateBadgeClass('Resuelta')).toContain('emerald');
+    expect(component.getStateBadgeClass('Cancelada')).toContain('rose');
+    expect(component.getStateBadgeClass('Sin estado')).toContain('slate');
+  });
+
   it('should close the detail side sheet and clear selection', () => {
     flushInitRequests();
 
