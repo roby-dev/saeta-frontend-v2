@@ -216,32 +216,37 @@ interface DistrictOption {
           </div>
         }
 
-        <!-- Selected Alert Floating Detail Card -->
-        @if (selectedAlert()) {
-          <div class="absolute bottom-5 right-5 z-20 bg-white rounded-lg shadow-2xl border border-slate-200 p-4 max-w-sm w-full animate-fade-in">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+        <!-- Selected Alert Detail Side Sheet -->
+        @if (selectedAlert() && isDetailOpen()) {
+          <div class="fixed inset-0 z-40 bg-black/30" (click)="closeDetail()"></div>
+          <aside class="fixed inset-y-0 right-0 z-40 bg-white shadow-2xl border-l border-slate-200 p-5 w-full max-w-md overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
               <div class="flex items-center gap-2">
                 <span
                   class="w-3 h-3 rounded-full"
                   [ngClass]="getDotClass(getAlertStateName(selectedAlert()!))"
                 ></span>
-                <span class="font-bold text-xs text-slate-800">
+                <span class="font-bold text-sm text-slate-800">
                   Alerta #{{ selectedAlert()!.id.slice(-6).toUpperCase() }}
                 </span>
               </div>
               <button
                 type="button"
-                (click)="selectedAlert.set(null); clearRoute()"
-                class="text-slate-400 hover:text-slate-600 font-bold"
+                (click)="closeDetail()"
+                class="text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div class="py-2.5 space-y-1.5 text-xs text-slate-600">
+            <div class="py-3 space-y-2 text-xs text-slate-600">
               <p>
                 <b class="text-slate-700">Ciudadano:</b>
                 {{ selectedAlert()!.user?.name }} {{ selectedAlert()!.user?.lastname }}
+              </p>
+              <p>
+                <b class="text-slate-700">DNI:</b>
+                {{ selectedAlert()!.user?.dni || 'S/D' }}
               </p>
               @if (selectedAlert()!.user?.phone) {
                 <p>
@@ -270,6 +275,10 @@ interface DistrictOption {
                 <b class="text-slate-700">Fecha:</b>
                 {{ selectedAlert()!.createdAt ? (selectedAlert()!.createdAt | date: 'dd/MM/yyyy HH:mm') : selectedAlert()!.creationDate }}
               </p>
+              <p>
+                <b class="text-slate-700">Ubicación GPS:</b>
+                <span class="font-mono text-[11px]">{{ selectedAlert()!.latitude }}, {{ selectedAlert()!.longitude }}</span>
+              </p>
 
               @if (selectedAlert()!.attendedBy) {
                 <p>
@@ -281,11 +290,11 @@ interface DistrictOption {
                 <p class="text-amber-500 font-bold">
                   <b>Calificación:</b> ★ {{ selectedAlert()!.score }} / 5
                 </p>
-                @if (selectedAlert()!.commentary) {
-                  <p class="text-slate-500 italic bg-amber-50/60 p-1.5 rounded border border-amber-200">
-                    "{{ selectedAlert()!.commentary }}"
-                  </p>
-                }
+              }
+              @if (selectedAlert()!.commentary) {
+                <p class="text-slate-500 italic bg-amber-50/60 p-1.5 rounded border border-amber-200">
+                  "{{ selectedAlert()!.commentary }}"
+                </p>
               }
             </div>
 
@@ -354,7 +363,7 @@ interface DistrictOption {
                 </a>
               </div>
             </div>
-          </div>
+          </aside>
         }
 
         <!-- Alert Management Modal (Map View) -->
@@ -476,6 +485,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   private markersLayer?: L.LayerGroup;
   private personnelLayer?: L.LayerGroup;
   private readonly personnelMarkers = new Map<string, L.Marker>();
+  private readonly alertMarkers = new Map<string, L.Marker>();
   private readonly subs = new Subscription();
 
   constructor() {
@@ -503,6 +513,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly selectedDistrictId = signal<string>('');
   protected readonly selectedStateFilter = signal<string>('all');
   protected readonly selectedAlert = signal<Alert | null>(null);
+  protected readonly isDetailOpen = signal<boolean>(false);
   protected readonly managingAlert = signal<Alert | null>(null);
   protected readonly isSavingAlert = signal<boolean>(false);
   protected readonly isRoutingActive = signal<boolean>(false);
@@ -589,6 +600,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     if (alert) {
       this.selectedAlert.set(alert);
       this.centerOnAlert(alert);
+      this.alertMarkers.get(alert.id)?.openPopup();
     }
   }
 
@@ -699,6 +711,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.map || !this.markersLayer) return;
 
     this.markersLayer.clearLayers();
+    this.alertMarkers.clear();
     const alerts = this.displayedAlerts();
 
     for (const alert of alerts) {
@@ -729,17 +742,65 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const marker = L.marker([alert.latitude, alert.longitude], { icon });
 
-      marker.on('click', () => {
-        this.selectedAlert.set(alert);
+      marker.on('click', () => this.onMarkerClick(alert));
+      marker.bindPopup(() => this.buildPopupContent(alert), {
+        offset: [0, -8],
+        minWidth: 200,
       });
 
-      marker.bindTooltip(
-        `<b>#${alert.id.slice(-6).toUpperCase()}</b> - ${alert.type?.name || 'Alerta'} (${stateName})`,
-        { direction: 'top', offset: [0, -10] },
-      );
-
       this.markersLayer.addLayer(marker);
+      this.alertMarkers.set(alert.id, marker);
     }
+  }
+
+  private onMarkerClick(alert: Alert): void {
+    this.selectedAlert.set(alert);
+  }
+
+  private buildPopupContent(alert: Alert): HTMLElement {
+    const stateName = this.getAlertStateName(alert);
+    const citizen = `${alert.user?.name ?? ''} ${alert.user?.lastname ?? ''}`.trim() || 'Ciudadano';
+
+    const container = document.createElement('div');
+    container.className = 'text-xs text-slate-600 space-y-1';
+
+    const title = document.createElement('p');
+    title.className = 'font-bold text-slate-800';
+    title.textContent = `Alerta #${alert.id.slice(-6).toUpperCase()}`;
+
+    const type = document.createElement('p');
+    type.textContent = alert.type?.name || 'Emergencia';
+
+    const state = document.createElement('p');
+    state.className = 'font-semibold';
+    state.style.color = this.getMarkerColor(stateName);
+    state.textContent = stateName;
+
+    const user = document.createElement('p');
+    user.textContent = citizen;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'mt-1.5 w-full py-1 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white font-semibold cursor-pointer';
+    button.textContent = 'Ver más';
+    button.addEventListener('click', () => {
+      this.map?.closePopup();
+      this.openDetail(alert);
+    });
+
+    container.append(title, type, state, user, button);
+    return container;
+  }
+
+  openDetail(alert: Alert): void {
+    this.selectedAlert.set(alert);
+    this.isDetailOpen.set(true);
+  }
+
+  closeDetail(): void {
+    this.isDetailOpen.set(false);
+    this.selectedAlert.set(null);
+    this.clearRoute();
   }
 
   onDistrictChange(event: Event): void {
@@ -770,6 +831,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     this.selectedDistrictId.set('');
     this.selectedStateFilter.set('all');
     this.selectedAlert.set(null);
+    this.isDetailOpen.set(false);
     if (this.map) {
       this.map.flyTo(this.TACNA_CENTER, 13, { duration: 1.2 });
     }
