@@ -17,9 +17,24 @@ export interface AlertTypeSummary {
   priority?: number;
 }
 
+/**
+ * Stable, backend-owned state classification. The frontend renders styles and
+ * actions from this code, never from the (renameable) state.name string.
+ */
+export type StateCode = 'PENDING' | 'IN_PROGRESS' | 'RESOLVED' | 'REJECTED';
+
+/**
+ * Actions the backend allows a client to perform on an alert, based on its
+ * current state code (see AlertAction policy on the backend). `manage` maps
+ * to the generic PUT/PATCH update; `delegate` and `reject` map to their own
+ * dedicated endpoints.
+ */
+export type AlertAction = 'delegate' | 'reject' | 'manage';
+
 export interface AlertStateSummary {
   id: string;
   name: string;
+  code?: StateCode;
 }
 
 export interface Alert {
@@ -43,6 +58,9 @@ export interface Alert {
   attendedBy?: AlertUserSummary;
   type?: AlertTypeSummary;
   state?: AlertStateSummary;
+
+  // Actions the current alert.state.code allows a client to take.
+  allowedActions?: AlertAction[];
 }
 
 export interface AlertFilter {

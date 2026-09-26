@@ -240,6 +240,78 @@ describe('AlertsService', () => {
     expect(notificationServiceMock.showEmergency).toHaveBeenCalledWith(liveAlert);
   });
 
+  it('rejects an alert via POST /alerts/:id/reject and reloads alerts', () => {
+    service.alerts.set(mockAlerts);
+
+    const rejectedAlert: Alert = {
+      ...mockAlerts[0],
+      state: { id: 'state-4', name: 'Rechazada', code: 'REJECTED' },
+    };
+
+    service.rejectAlert('alert-1', 'No corresponde').subscribe((res) => {
+      expect(res.ok).toBe(true);
+    });
+
+    const reqPost = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1/reject`);
+    expect(reqPost.request.method).toBe('POST');
+    expect(reqPost.request.body).toEqual({ commentary: 'No corresponde' });
+    reqPost.flush({ ok: true, alerts: rejectedAlert });
+
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqReload.flush({ ok: true, alerts: [rejectedAlert, mockAlerts[1], mockAlerts[2]], total: 3 });
+
+    const found = service.alerts().find((a) => a.id === 'alert-1');
+    expect(found?.state?.code).toBe('REJECTED');
+  });
+
+  it('rejects an alert without a commentary by sending an empty body', () => {
+    service.rejectAlert('alert-1').subscribe();
+
+    const reqPost = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1/reject`);
+    expect(reqPost.request.body).toEqual({});
+    reqPost.flush({ ok: true, alerts: mockAlerts[0] });
+
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqReload.flush({ ok: true, alerts: mockAlerts, total: 3 });
+  });
+
+  it('delegates an alert via POST /alerts/:id/delegate and reloads alerts', () => {
+    service.alerts.set(mockAlerts);
+
+    const delegatedAlert: Alert = {
+      ...mockAlerts[0],
+      attendedById: 'user-officer',
+      state: { id: 'state-2', name: 'En proceso', code: 'IN_PROGRESS' },
+    };
+
+    service.delegateAlert('alert-1', 'user-officer', 'Atendiendo ahora').subscribe((res) => {
+      expect(res.ok).toBe(true);
+    });
+
+    const reqPost = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1/delegate`);
+    expect(reqPost.request.method).toBe('POST');
+    expect(reqPost.request.body).toEqual({ attendedById: 'user-officer', commentary: 'Atendiendo ahora' });
+    reqPost.flush({ ok: true, alerts: delegatedAlert });
+
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqReload.flush({ ok: true, alerts: [delegatedAlert, mockAlerts[1], mockAlerts[2]], total: 3 });
+
+    const found = service.alerts().find((a) => a.id === 'alert-1');
+    expect(found?.attendedById).toBe('user-officer');
+    expect(found?.state?.code).toBe('IN_PROGRESS');
+  });
+
+  it('delegates an alert without a commentary by omitting it from the body', () => {
+    service.delegateAlert('alert-1', 'user-officer').subscribe();
+
+    const reqPost = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1/delegate`);
+    expect(reqPost.request.body).toEqual({ attendedById: 'user-officer' });
+    reqPost.flush({ ok: true, alerts: mockAlerts[0] });
+
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqReload.flush({ ok: true, alerts: mockAlerts, total: 3 });
+  });
+
   it('handles realtime alertUpdated by updating the existing alert in signals', () => {
     service.alerts.set(mockAlerts);
 
