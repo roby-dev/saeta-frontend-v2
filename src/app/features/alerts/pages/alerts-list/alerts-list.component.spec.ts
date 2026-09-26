@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { environment } from '../../../../../environments/environment.js';
 import type { Alert } from '../../models/alert.model.js';
 import { AlertsService } from '../../services/alerts.service.js';
@@ -25,7 +25,10 @@ describe('AlertsListComponent', () => {
       creationDate: '2026-09-19T10:00:00.000Z',
       user: { id: 'user-1', name: 'Juan', lastname: 'Perez', dni: '11223344', phone: '999888777' },
       type: { id: 'type-1', name: 'Robo' },
-      state: { id: 'state-1', name: 'Pendiente' },
+      // Renamed state ('Pendiente' -> 'En espera') proves rendering follows
+      // the code, not the name.
+      state: { id: 'state-1', name: 'En espera', code: 'PENDING' },
+      allowedActions: ['delegate', 'reject', 'manage'],
     },
     {
       id: 'alert-2',
@@ -37,7 +40,8 @@ describe('AlertsListComponent', () => {
       creationDate: '2026-09-19T11:00:00.000Z',
       user: { id: 'user-2', name: 'Maria', lastname: 'Lopez', dni: '88776655', phone: '988776655' },
       type: { id: 'type-2', name: 'Accidente' },
-      state: { id: 'state-2', name: 'En proceso' },
+      state: { id: 'state-2', name: 'En proceso', code: 'IN_PROGRESS' },
+      allowedActions: ['reject', 'manage'],
     },
   ];
 
@@ -78,9 +82,9 @@ describe('AlertsListComponent', () => {
     reqStates.flush({
       ok: true,
       states: [
-        { id: 'state-1', name: 'Pendiente' },
-        { id: 'state-2', name: 'En proceso' },
-        { id: 'state-3', name: 'Resuelta' },
+        { id: 'state-1', name: 'En espera', code: 'PENDING' },
+        { id: 'state-2', name: 'En proceso', code: 'IN_PROGRESS' },
+        { id: 'state-3', name: 'Resuelta', code: 'RESOLVED' },
       ],
     });
 
@@ -149,13 +153,13 @@ describe('AlertsListComponent', () => {
     );
     req.flush({ ok: true, alerts: [mockAlerts[0]], total: 1 });
 
-    expect(component['isStateActive']('pendiente')).toBe(true);
+    expect(component['isStateActive']('PENDING')).toBe(true);
   });
 
-  it('should toggle state filter when setStateFilterDirect is called from metric cards', () => {
+  it('should toggle state filter by code when setStateFilterDirect is called from metric cards', () => {
     flushInitRequests();
 
-    component.setStateFilterDirect('proceso');
+    component.setStateFilterDirect('IN_PROGRESS');
     expect(component['selectedStateId']()).toBe('state-2');
 
     const req1 = httpMock.expectOne(
@@ -164,7 +168,7 @@ describe('AlertsListComponent', () => {
     req1.flush({ ok: true, alerts: [mockAlerts[1]], total: 1 });
 
     // Calling it again should toggle it off
-    component.setStateFilterDirect('proceso');
+    component.setStateFilterDirect('IN_PROGRESS');
     expect(component['selectedStateId']()).toBe('');
 
     const req2 = httpMock.expectOne(
@@ -188,5 +192,99 @@ describe('AlertsListComponent', () => {
 
     const req = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
     req.flush({ ok: true, alerts: mockAlerts, total: 2 });
+  });
+
+  it('should resolve which actions a renamed-but-still-PENDING alert allows, from allowedActions only', () => {
+    flushInitRequests();
+
+    // mockAlerts[0] carries name 'En espera' (not 'Pendiente') but code PENDING
+    // and allowedActions ['delegate', 'reject', 'manage'] from the backend.
+    expect(component['hasAction'](mockAlerts[0], 'delegate')).toBe(true);
+    expect(component['hasAction'](mockAlerts[0], 'reject')).toBe(true);
+    expect(component['hasAction'](mockAlerts[1], 'delegate')).toBe(false);
+    expect(component['hasAction'](mockAlerts[1], 'manage')).toBe(true);
+  });
+
+  it('should map state codes to list badge classes, independent of the state name', () => {
+    expect(component.getStateBadgeClass('PENDING')).toContain('amber');
+    expect(component.getStateBadgeClass('IN_PROGRESS')).toContain('sky');
+    expect(component.getStateBadgeClass('RESOLVED')).toContain('emerald');
+    expect(component.getStateBadgeClass('REJECTED')).toContain('rose');
+    expect(component.getStateBadgeClass(undefined)).toContain('slate');
+  });
+
+  it('should open the manage modal in delegate mode without preselecting a state', () => {
+    flushInitRequests();
+
+    component.openDelegateModal(mockAlerts[0]);
+    expect(component['managingAlert']()).toEqual(mockAlerts[0]);
+    expect(component['modalMode']()).toBe('delegate');
+  });
+
+  it('should delegate an alert to the selected officer', () => {
+    flushInitRequests();
+
+    component.openDelegateModal(mockAlerts[0]);
+    component['modalAttendedById'] = 'officer-1';
+
+    component.saveAlertChanges();
+
+    const reqPost = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1/delegate`);
+    expect(reqPost.request.method).toBe('POST');
+    expect(reqPost.request.body).toEqual({ attendedById: 'officer-1' });
+    const delegated: Alert = { ...mockAlerts[0], attendedById: 'officer-1' };
+    reqPost.flush({ ok: true, alerts: delegated });
+
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqReload.flush({ ok: true, alerts: [delegated] });
+
+    expect(component['managingAlert']()).toBeNull();
+  });
+
+  it('should reject an alert via the dedicated endpoint when confirmed', () => {
+    flushInitRequests();
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    component.rejectAlert(mockAlerts[0]);
+
+    const reqPost = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-1/reject`);
+    expect(reqPost.request.method).toBe('POST');
+    reqPost.flush({ ok: true, alerts: mockAlerts[0] });
+
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqReload.flush({ ok: true, alerts: mockAlerts, total: 2 });
+  });
+
+  it('should not reject an alert when the confirmation is dismissed', () => {
+    flushInitRequests();
+
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    component.rejectAlert(mockAlerts[0]);
+
+    httpMock.expectNone(`${environment.apiUrl}/alerts/alert-1/reject`);
+  });
+
+  it('should save generic manage changes sending only stateId/attendedById/commentary', () => {
+    flushInitRequests();
+
+    component.openManageModal(mockAlerts[1]);
+    component['modalStateId'] = 'state-3';
+    component['modalCommentary'] = 'Resuelto';
+
+    component.saveAlertChanges();
+
+    const reqPut = httpMock.expectOne(`${environment.apiUrl}/alerts/alert-2`);
+    expect(reqPut.request.method).toBe('PUT');
+    expect(reqPut.request.body).toEqual({
+      stateId: 'state-3',
+      attendedById: undefined,
+      commentary: 'Resuelto',
+    });
+    reqPut.flush({ ok: true, alerts: { ...mockAlerts[1], stateId: 'state-3' } });
+
+    const reqReload = httpMock.expectOne((r) => r.url === `${environment.apiUrl}/alerts`);
+    reqReload.flush({ ok: true, alerts: mockAlerts, total: 2 });
   });
 });

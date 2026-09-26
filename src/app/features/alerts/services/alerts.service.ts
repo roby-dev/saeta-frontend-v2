@@ -200,20 +200,47 @@ export class AlertsService {
     payload: Partial<Alert> | Record<string, unknown>,
   ): Observable<{ ok: boolean; alerts: Alert }> {
     return this.http.put<{ ok: boolean; alerts: Alert }>(`${this.API_URL}/${id}`, payload).pipe(
-      tap((res) => {
-        if (res.ok && res.alerts) {
-          // Update in local signal array
-          this.alerts.update((list) =>
-            list.map((item) => (item.id === id ? { ...item, ...res.alerts } : item)),
-          );
-          if (this.selectedAlert()?.id === id) {
-            this.selectedAlert.set({ ...this.selectedAlert()!, ...res.alerts });
-          }
-          // Reload alerts to refresh global counts and pagination
-          this.loadAlerts(this.activeFilters()).subscribe();
-        }
-      }),
+      tap((res) => this.applyAlertMutation(id, res)),
     );
+  }
+
+  /** Rejects a pending/in-progress alert via the dedicated backend endpoint. */
+  rejectAlert(id: string, commentary?: string): Observable<{ ok: boolean; alerts: Alert }> {
+    const body = commentary ? { commentary } : {};
+    return this.http
+      .post<{ ok: boolean; alerts: Alert }>(`${this.API_URL}/${id}/reject`, body)
+      .pipe(tap((res) => this.applyAlertMutation(id, res)));
+  }
+
+  /** Delegates a pending alert to a security officer via the dedicated backend endpoint. */
+  delegateAlert(
+    id: string,
+    attendedById: string,
+    commentary?: string,
+  ): Observable<{ ok: boolean; alerts: Alert }> {
+    const body: { attendedById: string; commentary?: string } = { attendedById };
+    if (commentary) body.commentary = commentary;
+    return this.http
+      .post<{ ok: boolean; alerts: Alert }>(`${this.API_URL}/${id}/delegate`, body)
+      .pipe(tap((res) => this.applyAlertMutation(id, res)));
+  }
+
+  /**
+   * Shared post-mutation effect for updateAlert/rejectAlert/delegateAlert:
+   * merges the returned alert into local signals and reloads the active
+   * filters to refresh server-computed counts and pagination.
+   */
+  private applyAlertMutation(id: string, res: { ok: boolean; alerts: Alert }): void {
+    if (res.ok && res.alerts) {
+      this.alerts.update((list) =>
+        list.map((item) => (item.id === id ? { ...item, ...res.alerts } : item)),
+      );
+      if (this.selectedAlert()?.id === id) {
+        this.selectedAlert.set({ ...this.selectedAlert()!, ...res.alerts });
+      }
+      // Reload alerts to refresh global counts and pagination
+      this.loadAlerts(this.activeFilters()).subscribe();
+    }
   }
 
 

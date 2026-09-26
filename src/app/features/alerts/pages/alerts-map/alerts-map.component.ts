@@ -16,8 +16,9 @@ import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
 import * as L from 'leaflet';
 import { RealtimeService } from '../../../../core/services/realtime.service.js';
-import type { Alert, AlertUserSummary } from '../../models/alert.model.js';
+import type { Alert, AlertAction, StateCode } from '../../models/alert.model.js';
 import { AlertsService } from '../../services/alerts.service.js';
+import { getAlertStateStyle } from '../../utils/alert-state-style.js';
 
 interface DistrictOption {
   id: string;
@@ -91,10 +92,10 @@ interface DistrictOption {
               class="w-full text-xs p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white"
             >
               <option value="all">Todas las alertas</option>
-              <option value="pendiente">Pendientes</option>
-              <option value="proceso">En proceso</option>
-              <option value="resuelta">Resueltas</option>
-              <option value="rechazada">Canceladas / Rechazadas</option>
+              <option value="PENDING">Pendientes</option>
+              <option value="IN_PROGRESS">En proceso</option>
+              <option value="RESOLVED">Resueltas</option>
+              <option value="REJECTED">Canceladas / Rechazadas</option>
             </select>
           </div>
 
@@ -149,9 +150,9 @@ interface DistrictOption {
           <div class="text-xs space-y-1.5">
             <button
               type="button"
-              (click)="setStateFilter(selectedStateFilter() === 'pendiente' ? 'all' : 'pendiente')"
+              (click)="setStateFilter(selectedStateFilter() === 'PENDING' ? 'all' : 'PENDING')"
               class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
-              [ngClass]="selectedStateFilter() === 'pendiente' ? 'bg-amber-50 border border-amber-200' : 'hover:bg-slate-50'"
+              [ngClass]="selectedStateFilter() === 'PENDING' ? 'bg-amber-50 border border-amber-200' : 'hover:bg-slate-50'"
             >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-amber-500"></span>
@@ -162,9 +163,9 @@ interface DistrictOption {
 
             <button
               type="button"
-              (click)="setStateFilter(selectedStateFilter() === 'proceso' ? 'all' : 'proceso')"
+              (click)="setStateFilter(selectedStateFilter() === 'IN_PROGRESS' ? 'all' : 'IN_PROGRESS')"
               class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
-              [ngClass]="selectedStateFilter() === 'proceso' ? 'bg-sky-50 border border-sky-200' : 'hover:bg-slate-50'"
+              [ngClass]="selectedStateFilter() === 'IN_PROGRESS' ? 'bg-sky-50 border border-sky-200' : 'hover:bg-slate-50'"
             >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-[#009efb]"></span>
@@ -175,9 +176,9 @@ interface DistrictOption {
 
             <button
               type="button"
-              (click)="setStateFilter(selectedStateFilter() === 'resuelta' ? 'all' : 'resuelta')"
+              (click)="setStateFilter(selectedStateFilter() === 'RESOLVED' ? 'all' : 'RESOLVED')"
               class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
-              [ngClass]="selectedStateFilter() === 'resuelta' ? 'bg-emerald-50 border border-emerald-200' : 'hover:bg-slate-50'"
+              [ngClass]="selectedStateFilter() === 'RESOLVED' ? 'bg-emerald-50 border border-emerald-200' : 'hover:bg-slate-50'"
             >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
@@ -188,9 +189,9 @@ interface DistrictOption {
 
             <button
               type="button"
-              (click)="setStateFilter(selectedStateFilter() === 'rechazada' ? 'all' : 'rechazada')"
+              (click)="setStateFilter(selectedStateFilter() === 'REJECTED' ? 'all' : 'REJECTED')"
               class="w-full flex items-center justify-between p-1.5 rounded transition-colors text-left"
-              [ngClass]="selectedStateFilter() === 'rechazada' ? 'bg-rose-50 border border-rose-200' : 'hover:bg-slate-50'"
+              [ngClass]="selectedStateFilter() === 'REJECTED' ? 'bg-rose-50 border border-rose-200' : 'hover:bg-slate-50'"
             >
               <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-rose-500"></span>
@@ -216,145 +217,213 @@ interface DistrictOption {
           </div>
         }
 
-        <!-- Selected Alert Floating Detail Card -->
-        @if (selectedAlert()) {
-          <div class="absolute bottom-5 right-5 z-20 bg-white rounded-lg shadow-2xl border border-slate-200 p-4 max-w-sm w-full animate-fade-in">
-            <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div class="flex items-center gap-2">
-                <span
-                  class="w-3 h-3 rounded-full"
-                  [ngClass]="getDotClass(getAlertStateName(selectedAlert()!))"
-                ></span>
-                <span class="font-bold text-xs text-slate-800">
-                  Alerta #{{ selectedAlert()!.id.slice(-6).toUpperCase() }}
-                </span>
-              </div>
-              <button
-                type="button"
-                (click)="selectedAlert.set(null); clearRoute()"
-                class="text-slate-400 hover:text-slate-600 font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div class="py-2.5 space-y-1.5 text-xs text-slate-600">
-              <p>
-                <b class="text-slate-700">Ciudadano:</b>
-                {{ selectedAlert()!.user?.name }} {{ selectedAlert()!.user?.lastname }}
-              </p>
-              @if (selectedAlert()!.user?.phone) {
-                <p>
-                  <b class="text-slate-700">Teléfono:</b>
-                  <a [href]="'tel:' + selectedAlert()!.user?.phone" class="text-blue-600 font-semibold underline">
-                    {{ selectedAlert()!.user?.phone }}
-                  </a>
-                </p>
-              }
-              <p>
-                <b class="text-slate-700">Incidente:</b>
-                {{ selectedAlert()!.type?.name || 'Emergencia' }}
-              </p>
-              <p>
-                <b class="text-slate-700">Estado:</b>
-                <span class="font-semibold ml-1" [ngClass]="{
-                  'text-amber-600': getAlertStateName(selectedAlert()!).toLowerCase().includes('pendiente'),
-                  'text-[#009efb]': getAlertStateName(selectedAlert()!).toLowerCase().includes('proceso'),
-                  'text-emerald-600': getAlertStateName(selectedAlert()!).toLowerCase().includes('resuelt'),
-                  'text-rose-500': getAlertStateName(selectedAlert()!).toLowerCase().includes('rechazad') || getAlertStateName(selectedAlert()!).toLowerCase().includes('cancelad')
-                }">
-                  {{ getAlertStateName(selectedAlert()!) }}
-                </span>
-              </p>
-              <p>
-                <b class="text-slate-700">Fecha:</b>
-                {{ selectedAlert()!.createdAt ? (selectedAlert()!.createdAt | date: 'dd/MM/yyyy HH:mm') : selectedAlert()!.creationDate }}
-              </p>
-
-              @if (selectedAlert()!.attendedBy) {
-                <p>
-                  <b class="text-slate-700">Atendido por:</b>
-                  {{ selectedAlert()!.attendedBy?.name }} {{ selectedAlert()!.attendedBy?.lastname }}
-                </p>
-              }
-              @if (selectedAlert()!.score) {
-                <p class="text-amber-500 font-bold">
-                  <b>Calificación:</b> ★ {{ selectedAlert()!.score }} / 5
-                </p>
-                @if (selectedAlert()!.commentary) {
-                  <p class="text-slate-500 italic bg-amber-50/60 p-1.5 rounded border border-amber-200">
-                    "{{ selectedAlert()!.commentary }}"
-                  </p>
-                }
-              }
-            </div>
-
-            <!-- Action Buttons based on Alert State -->
-            <div class="pt-2.5 mt-1 border-t border-slate-100 flex flex-col gap-1.5">
-              @if (getAlertStateName(selectedAlert()!).toLowerCase().includes('pendiente')) {
-                <div class="flex gap-2">
-                  <button
-                    type="button"
-                    (click)="openDelegateModal(selectedAlert()!)"
-                    class="flex-1 py-1.5 px-2 bg-[#009efb] hover:bg-[#0088db] text-white rounded text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <span>Delegar / Atender</span>
-                  </button>
-                  <button
-                    type="button"
-                    (click)="rejectAlert(selectedAlert()!)"
-                    class="py-1.5 px-3 border border-rose-300 hover:bg-rose-50 text-rose-600 rounded text-xs font-semibold transition-colors cursor-pointer"
-                  >
-                    Rechazar
-                  </button>
+        <!-- Selected Alert Detail Side Sheet -->
+        @if (selectedAlert() && isDetailOpen()) {
+          @let alert = selectedAlert()!;
+          @let stateName = getAlertStateName(alert);
+          @let stateCode = resolveStateCode(alert);
+          <div class="fixed inset-0 z-40 bg-black/30" (click)="closeDetail()"></div>
+          <aside class="fixed inset-y-0 right-0 z-40 bg-slate-50 shadow-2xl border-l border-slate-200 w-full max-w-lg xl:max-w-xl flex flex-col">
+            <!-- Header -->
+            <header class="bg-white border-b border-slate-200 px-6 py-5">
+              <div class="flex items-start justify-between gap-4">
+                <div class="space-y-1.5">
+                  <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Detalle de alerta</p>
+                  <h3 class="text-xl font-bold text-slate-800">#{{ alert.id.slice(-6).toUpperCase() }}</h3>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold" [ngClass]="getStateBadgeClass(stateCode)">
+                      <span class="w-2 h-2 rounded-full" [ngClass]="getDotClass(stateCode)"></span>
+                      {{ stateName }}
+                    </span>
+                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                      {{ alert.type?.name || 'Emergencia' }}
+                    </span>
+                  </div>
                 </div>
-              } @else if (getAlertStateName(selectedAlert()!).toLowerCase().includes('proceso')) {
-                <div class="flex gap-2">
-                  <button
-                    type="button"
-                    (click)="toggleRouteToPersonnel(selectedAlert()!)"
-                    class="flex-1 py-1.5 px-2 rounded text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1 text-white cursor-pointer"
-                    [ngClass]="isRoutingActive() ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
-                  >
-                    <span>{{ isRoutingActive() ? 'Ocultar Ruta' : 'Trazar Ruta' }}</span>
-                  </button>
-                  <button
-                    type="button"
-                    (click)="openManageModal(selectedAlert()!)"
-                    class="flex-1 py-1.5 px-2 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-                  >
-                    Gestionar
-                  </button>
-                </div>
-              } @else {
                 <button
                   type="button"
-                  (click)="openManageModal(selectedAlert()!)"
-                  class="w-full py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold transition-colors cursor-pointer"
+                  (click)="closeDetail()"
+                  class="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 text-lg cursor-pointer"
+                  aria-label="Cerrar detalle"
+                >
+                  ✕
+                </button>
+              </div>
+            </header>
+
+            <!-- Body -->
+            <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4 text-sm text-slate-600">
+              <!-- Citizen -->
+              <section class="bg-white rounded-lg border border-slate-200 p-4">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Ciudadano</h4>
+                <div class="flex items-center gap-3 mb-4">
+                  @if (alert.user?.image) {
+                    <img [src]="alert.user!.image" alt="" class="w-12 h-12 rounded-full object-cover" />
+                  } @else {
+                    <div class="w-12 h-12 rounded-full bg-[#1976d2] text-white flex items-center justify-center font-bold">
+                      {{ alert.user?.name?.charAt(0) || 'C' }}
+                    </div>
+                  }
+                  <div>
+                    <p class="font-bold text-slate-800">{{ alert.user?.name }} {{ alert.user?.lastname }}</p>
+                    <p class="text-xs text-slate-400">DNI {{ alert.user?.dni || 'S/D' }}</p>
+                  </div>
+                </div>
+                <dl class="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <dt class="text-slate-400">Teléfono</dt>
+                    <dd class="font-semibold text-slate-700">
+                      @if (alert.user?.phone) {
+                        <a [href]="'tel:' + alert.user!.phone" class="text-blue-600 hover:underline">{{ alert.user!.phone }}</a>
+                      } @else {
+                        S/D
+                      }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-slate-400">Correo</dt>
+                    <dd class="font-semibold text-slate-700 truncate">{{ alert.user?.email || 'S/D' }}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <!-- Timeline -->
+              <section class="bg-white rounded-lg border border-slate-200 p-4">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Línea de tiempo</h4>
+                <ol class="relative border-l-2 border-slate-200 ml-1.5 space-y-4 text-xs">
+                  <li class="pl-4 relative">
+                    <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full bg-amber-500 ring-2 ring-white"></span>
+                    <p class="font-semibold text-slate-700">Alerta creada</p>
+                    <p class="text-slate-400">{{ (alert.createdAt || alert.creationDate) | date: 'dd/MM/yyyy HH:mm' }}</p>
+                  </li>
+                  <li class="pl-4 relative">
+                    <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full ring-2 ring-white" [ngClass]="alert.attentionDate ? 'bg-sky-500' : 'bg-slate-300'"></span>
+                    <p class="font-semibold" [ngClass]="alert.attentionDate ? 'text-slate-700' : 'text-slate-400'">En atención</p>
+                    <p class="text-slate-400">{{ alert.attentionDate ? (alert.attentionDate | date: 'dd/MM/yyyy HH:mm') : 'Pendiente' }}</p>
+                  </li>
+                  <li class="pl-4 relative">
+                    <span class="absolute -left-[7px] top-0.5 w-3 h-3 rounded-full ring-2 ring-white" [ngClass]="alert.culminationDate ? 'bg-emerald-500' : 'bg-slate-300'"></span>
+                    <p class="font-semibold" [ngClass]="alert.culminationDate ? 'text-slate-700' : 'text-slate-400'">Culminada</p>
+                    <p class="text-slate-400">{{ alert.culminationDate ? (alert.culminationDate | date: 'dd/MM/yyyy HH:mm') : 'Pendiente' }}</p>
+                  </li>
+                </ol>
+              </section>
+
+              <!-- Location -->
+              <section class="bg-white rounded-lg border border-slate-200 p-4">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Ubicación</h4>
+                <dl class="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <dt class="text-slate-400">Latitud</dt>
+                    <dd class="font-mono font-semibold text-slate-700">{{ alert.latitude | number: '1.6-6' }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-slate-400">Longitud</dt>
+                    <dd class="font-mono font-semibold text-slate-700">{{ alert.longitude | number: '1.6-6' }}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <!-- Attention -->
+              <section class="bg-white rounded-lg border border-slate-200 p-4">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3">Atención</h4>
+                @if (alert.attendedBy) {
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+                      {{ alert.attendedBy.name.charAt(0) }}
+                    </div>
+                    <div>
+                      <p class="font-semibold text-slate-800">{{ alert.attendedBy.name }} {{ alert.attendedBy.lastname }}</p>
+                      <p class="text-xs text-slate-400">{{ alert.attendedBy.role || 'Personal de seguridad' }}</p>
+                    </div>
+                  </div>
+                } @else {
+                  <p class="text-xs text-slate-400">Sin personal asignado.</p>
+                }
+
+                @if (alert.score) {
+                  <p class="mt-3 text-amber-500 font-bold text-sm">★ {{ alert.score }} / 5</p>
+                }
+                @if (alert.commentary) {
+                  <p class="mt-3 text-xs text-slate-600 italic bg-slate-50 p-3 rounded border border-slate-200">
+                    "{{ alert.commentary }}"
+                  </p>
+                }
+              </section>
+            </div>
+
+            <!-- Footer actions -->
+            <footer class="bg-white border-t border-slate-200 px-6 py-4 space-y-2">
+              @if (hasAction(alert, 'delegate')) {
+                <div class="flex gap-2">
+                  <button
+                    type="button"
+                    (click)="openDelegateModal(alert)"
+                    class="flex-1 py-2.5 px-3 bg-[#009efb] hover:bg-[#0088db] text-white rounded text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+                  >
+                    Delegar / Atender
+                  </button>
+                  @if (hasAction(alert, 'reject')) {
+                    <button
+                      type="button"
+                      (click)="rejectAlert(alert)"
+                      class="py-2.5 px-4 border border-rose-300 hover:bg-rose-50 text-rose-600 rounded text-sm font-semibold transition-colors cursor-pointer"
+                    >
+                      Rechazar
+                    </button>
+                  }
+                </div>
+              } @else if (stateCode === 'IN_PROGRESS') {
+                <div class="flex gap-2">
+                  @if (hasAttendedOfficer(alert)) {
+                    <button
+                      type="button"
+                      (click)="toggleRouteToPersonnel(alert)"
+                      class="flex-1 py-2.5 px-3 rounded text-sm font-semibold shadow-sm transition-colors text-white cursor-pointer"
+                      [ngClass]="isRoutingActive() ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'"
+                    >
+                      {{ isRoutingActive() ? 'Ocultar Ruta' : 'Trazar Ruta' }}
+                    </button>
+                  }
+                  @if (hasAction(alert, 'manage')) {
+                    <button
+                      type="button"
+                      (click)="openManageModal(alert)"
+                      class="flex-1 py-2.5 px-3 bg-[#1976d2] hover:bg-[#1565c0] text-white rounded text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+                    >
+                      Gestionar
+                    </button>
+                  }
+                </div>
+              } @else if (hasAction(alert, 'manage')) {
+                <button
+                  type="button"
+                  (click)="openManageModal(alert)"
+                  class="w-full py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Ver / Modificar Alerta
                 </button>
               }
 
-              <!-- Navigation & Focus Row -->
-              <div class="flex gap-2 pt-1">
+              <div class="flex gap-2">
                 <button
                   type="button"
-                  (click)="centerOnAlert(selectedAlert()!)"
-                  class="flex-1 text-center py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                  (click)="centerOnAlert(alert)"
+                  class="flex-1 py-2.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Enfocar
                 </button>
                 <a
-                  [href]="'https://www.google.com/maps?q=' + selectedAlert()!.latitude + ',' + selectedAlert()!.longitude"
+                  [href]="'https://www.google.com/maps?q=' + alert.latitude + ',' + alert.longitude"
                   target="_blank"
-                  class="flex-1 text-center py-1.5 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white text-xs font-semibold transition-colors"
+                  rel="noopener"
+                  class="flex-1 text-center py-2.5 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white text-sm font-semibold transition-colors"
                 >
                   Navegar GPS ↗
                 </a>
               </div>
-            </div>
-          </div>
+            </footer>
+          </aside>
         }
 
         <!-- Alert Management Modal (Map View) -->
@@ -364,7 +433,7 @@ interface DistrictOption {
               <!-- Modal Header -->
               <div class="bg-[#1976d2] px-6 py-4 text-white flex items-center justify-between">
                 <h5 class="text-base font-bold">
-                  Gestionar Alerta #{{ managingAlert()!.id.slice(-6).toUpperCase() }}
+                  {{ modalMode() === 'delegate' ? 'Delegar' : 'Gestionar' }} Alerta #{{ managingAlert()!.id.slice(-6).toUpperCase() }}
                 </h5>
                 <button
                   type="button"
@@ -400,18 +469,20 @@ interface DistrictOption {
                   </p>
                 </div>
 
-                <!-- Update State -->
-                <div>
-                  <label class="block font-bold text-slate-700 mb-1">Estado de la Alerta:</label>
-                  <select
-                    [(ngModel)]="modalStateId"
-                    class="w-full p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white text-xs"
-                  >
-                    @for (st of alertsService.states(); track st.id) {
-                      <option [value]="st.id">{{ st.name }}</option>
-                    }
-                  </select>
-                </div>
+                <!-- Update State (generic manage mode only; delegate mode only assigns personnel) -->
+                @if (modalMode() === 'manage') {
+                  <div>
+                    <label class="block font-bold text-slate-700 mb-1">Estado de la Alerta:</label>
+                    <select
+                      [(ngModel)]="modalStateId"
+                      class="w-full p-2 border border-slate-300 rounded focus:border-[#1976d2] focus:outline-none bg-white text-xs"
+                    >
+                      @for (st of alertsService.states(); track st.id) {
+                        <option [value]="st.id">{{ st.name }}</option>
+                      }
+                    </select>
+                  </div>
+                }
 
                 <!-- Assign Personnel -->
                 <div>
@@ -453,7 +524,7 @@ interface DistrictOption {
                 <button
                   type="button"
                   (click)="saveAlertChanges()"
-                  [disabled]="isSavingAlert()"
+                  [disabled]="isSavingAlert() || (modalMode() === 'delegate' && !modalAttendedById)"
                   class="px-4 py-2 bg-[#1976d2] hover:bg-[#1565c0] text-white font-semibold rounded text-xs disabled:opacity-50 cursor-pointer"
                 >
                   {{ isSavingAlert() ? 'Guardando...' : 'Guardar Cambios' }}
@@ -476,6 +547,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   private markersLayer?: L.LayerGroup;
   private personnelLayer?: L.LayerGroup;
   private readonly personnelMarkers = new Map<string, L.Marker>();
+  private readonly alertMarkers = new Map<string, L.Marker>();
   private readonly subs = new Subscription();
 
   constructor() {
@@ -501,9 +573,11 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   protected readonly selectedDistrictId = signal<string>('');
-  protected readonly selectedStateFilter = signal<string>('all');
+  protected readonly selectedStateFilter = signal<'all' | StateCode>('all');
   protected readonly selectedAlert = signal<Alert | null>(null);
+  protected readonly isDetailOpen = signal<boolean>(false);
   protected readonly managingAlert = signal<Alert | null>(null);
+  protected readonly modalMode = signal<'manage' | 'delegate'>('manage');
   protected readonly isSavingAlert = signal<boolean>(false);
   protected readonly isRoutingActive = signal<boolean>(false);
   protected modalStateId = '';
@@ -533,25 +607,11 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   // Filtered alerts for map display
   protected readonly displayedAlerts = computed(() => {
     const list = this.alertsService.alerts();
-    const filter = this.selectedStateFilter().toLowerCase();
+    const filter = this.selectedStateFilter();
 
     if (filter === 'all') return list;
 
-    return list.filter((a) => {
-      let stateName = a.state?.name?.toLowerCase() ?? '';
-      if (!stateName && a.stateId) {
-        const matched = this.alertsService.states().find((s) => s.id === a.stateId);
-        if (matched) {
-          stateName = matched.name.toLowerCase();
-        }
-      }
-
-      if (filter === 'pendiente') return stateName.includes('pendiente');
-      if (filter === 'proceso') return stateName.includes('proceso');
-      if (filter === 'resuelta') return stateName.includes('resuelt');
-      if (filter === 'rechazada') return stateName.includes('rechazad') || stateName.includes('cancelad');
-      return true;
-    });
+    return list.filter((a) => this.resolveStateCode(a) === filter);
   });
 
   ngOnInit(): void {
@@ -589,6 +649,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     if (alert) {
       this.selectedAlert.set(alert);
       this.centerOnAlert(alert);
+      this.alertMarkers.get(alert.id)?.openPopup();
     }
   }
 
@@ -699,13 +760,13 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.map || !this.markersLayer) return;
 
     this.markersLayer.clearLayers();
+    this.alertMarkers.clear();
     const alerts = this.displayedAlerts();
 
     for (const alert of alerts) {
       if (!alert.latitude || !alert.longitude) continue;
 
-      const stateName = this.getAlertStateName(alert);
-      const color = this.getMarkerColor(stateName);
+      const color = this.getMarkerColor(this.resolveStateCode(alert));
       const icon = L.divIcon({
         className: 'custom-map-pin',
         html: `
@@ -729,17 +790,65 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const marker = L.marker([alert.latitude, alert.longitude], { icon });
 
-      marker.on('click', () => {
-        this.selectedAlert.set(alert);
+      marker.on('click', () => this.onMarkerClick(alert));
+      marker.bindPopup(() => this.buildPopupContent(alert), {
+        offset: [0, -8],
+        minWidth: 200,
       });
 
-      marker.bindTooltip(
-        `<b>#${alert.id.slice(-6).toUpperCase()}</b> - ${alert.type?.name || 'Alerta'} (${stateName})`,
-        { direction: 'top', offset: [0, -10] },
-      );
-
       this.markersLayer.addLayer(marker);
+      this.alertMarkers.set(alert.id, marker);
     }
+  }
+
+  private onMarkerClick(alert: Alert): void {
+    this.selectedAlert.set(alert);
+  }
+
+  private buildPopupContent(alert: Alert): HTMLElement {
+    const stateName = this.getAlertStateName(alert);
+    const citizen = `${alert.user?.name ?? ''} ${alert.user?.lastname ?? ''}`.trim() || 'Ciudadano';
+
+    const container = document.createElement('div');
+    container.className = 'text-xs text-slate-600 space-y-1';
+
+    const title = document.createElement('p');
+    title.className = 'font-bold text-slate-800';
+    title.textContent = `Alerta #${alert.id.slice(-6).toUpperCase()}`;
+
+    const type = document.createElement('p');
+    type.textContent = alert.type?.name || 'Emergencia';
+
+    const state = document.createElement('p');
+    state.className = 'font-semibold';
+    state.style.color = this.getMarkerColor(this.resolveStateCode(alert));
+    state.textContent = stateName;
+
+    const user = document.createElement('p');
+    user.textContent = citizen;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'mt-1.5 w-full py-1 rounded bg-[#1976d2] hover:bg-[#1565c0] text-white font-semibold cursor-pointer';
+    button.textContent = 'Ver más';
+    button.addEventListener('click', () => {
+      this.map?.closePopup();
+      this.openDetail(alert);
+    });
+
+    container.append(title, type, state, user, button);
+    return container;
+  }
+
+  openDetail(alert: Alert): void {
+    this.selectedAlert.set(alert);
+    this.isDetailOpen.set(true);
+  }
+
+  closeDetail(): void {
+    this.isDetailOpen.set(false);
+    this.selectedAlert.set(null);
+    this.clearRoute();
   }
 
   onDistrictChange(event: Event): void {
@@ -757,11 +866,11 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onStateFilterChange(event: Event): void {
     const target = event.target as HTMLSelectElement;
-    const value = target?.value ?? 'all';
+    const value = (target?.value ?? 'all') as 'all' | StateCode;
     this.setStateFilter(value);
   }
 
-  setStateFilter(filter: string): void {
+  setStateFilter(filter: 'all' | StateCode): void {
     this.selectedStateFilter.set(filter);
     this.updateMarkers();
   }
@@ -770,6 +879,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     this.selectedDistrictId.set('');
     this.selectedStateFilter.set('all');
     this.selectedAlert.set(null);
+    this.isDetailOpen.set(false);
     if (this.map) {
       this.map.flyTo(this.TACNA_CENTER, 13, { duration: 1.2 });
     }
@@ -777,31 +887,54 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   openDelegateModal(alert: Alert): void {
-    const processState = this.alertsService.states().find((s) => s.name.toLowerCase().includes('proceso'));
-    this.openManageModal(alert, processState?.id);
+    this.managingAlert.set(alert);
+    this.modalMode.set('delegate');
+    this.modalAttendedById = alert.attendedById || alert.attendedBy?.id || '';
+    this.modalCommentary = alert.commentary || '';
   }
 
-  openManageModal(alert: Alert, preselectedStateId?: string): void {
+  openManageModal(alert: Alert): void {
     this.managingAlert.set(alert);
-    this.modalStateId = preselectedStateId || alert.stateId || alert.state?.id || '';
+    this.modalMode.set('manage');
+    this.modalStateId = alert.stateId || alert.state?.id || '';
     this.modalAttendedById = alert.attendedById || alert.attendedBy?.id || '';
     this.modalCommentary = alert.commentary || '';
   }
 
   closeManageModal(): void {
     this.managingAlert.set(null);
+    this.modalMode.set('manage');
   }
 
   saveAlertChanges(): void {
     const alert = this.managingAlert();
     if (!alert) return;
 
+    if (this.modalMode() === 'delegate') {
+      if (!this.modalAttendedById) return;
+      this.isSavingAlert.set(true);
+      this.alertsService
+        .delegateAlert(alert.id, this.modalAttendedById, this.modalCommentary || undefined)
+        .subscribe({
+          next: (res) => {
+            this.isSavingAlert.set(false);
+            if (res.alerts) {
+              this.selectedAlert.set(res.alerts);
+            }
+            this.closeManageModal();
+          },
+          error: (err) => {
+            console.error('Error delegating alert from map', err);
+            this.isSavingAlert.set(false);
+          },
+        });
+      return;
+    }
+
     this.isSavingAlert.set(true);
     const payload = {
       stateId: this.modalStateId,
-      state: this.modalStateId,
       attendedById: this.modalAttendedById || undefined,
-      attendedBy: this.modalAttendedById || undefined,
       commentary: this.modalCommentary || undefined,
     };
 
@@ -821,22 +954,11 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   rejectAlert(alert: Alert): void {
-    const cancelState = this.alertsService.states().find((s) => {
-      const n = s.name.toLowerCase();
-      return n.includes('rechazad') || n.includes('cancelad');
-    });
-
-    if (!cancelState) return;
-
     if (
       typeof window !== 'undefined' &&
       window.confirm(`¿Está seguro que desea rechazar/cancelar la alerta #${alert.id.slice(-6).toUpperCase()}?`)
     ) {
-      this.alertsService.updateAlert(alert.id, {
-        stateId: cancelState.id,
-        state: cancelState.id,
-        commentary: 'Cancelada desde el monitor de mapa',
-      }).subscribe({
+      this.alertsService.rejectAlert(alert.id, 'Cancelada desde el monitor de mapa').subscribe({
         next: (res) => {
           if (res.alerts) {
             this.selectedAlert.set(res.alerts);
@@ -904,6 +1026,7 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /** Display name only; id-based catalog fallback, never name matching. */
   protected getAlertStateName(alert: Alert): string {
     if (alert.state?.name) return alert.state.name;
     if (alert.stateId) {
@@ -913,21 +1036,34 @@ export class AlertsMapComponent implements OnInit, AfterViewInit, OnDestroy {
     return 'Sin estado';
   }
 
-  private getMarkerColor(stateName?: string): string {
-    const s = stateName?.toLowerCase() ?? '';
-    if (s.includes('pendiente')) return '#ffb22b';
-    if (s.includes('proceso')) return '#009efb';
-    if (s.includes('resuelt')) return '#26c6da';
-    if (s.includes('rechazad') || s.includes('cancelad')) return '#ef5350';
-    return '#745af2';
+  /** Resolves the alert's StateCode from the populated relation or, failing
+   * that, an id lookup against the state catalog. Never inspects the name. */
+  protected resolveStateCode(alert: Alert): StateCode | undefined {
+    if (alert.state?.code) return alert.state.code;
+    if (alert.stateId) {
+      const matched = this.alertsService.states().find((s) => s.id === alert.stateId);
+      return matched?.code;
+    }
+    return undefined;
   }
 
-  getDotClass(stateName?: string): string {
-    const s = stateName?.toLowerCase() ?? '';
-    if (s.includes('pendiente')) return 'bg-amber-500';
-    if (s.includes('proceso')) return 'bg-sky-500';
-    if (s.includes('resuelt')) return 'bg-emerald-500';
-    if (s.includes('rechazad') || s.includes('cancelad')) return 'bg-rose-500';
-    return 'bg-slate-400';
+  protected hasAction(alert: Alert, action: AlertAction): boolean {
+    return (alert.allowedActions ?? []).includes(action);
+  }
+
+  protected hasAttendedOfficer(alert: Alert): boolean {
+    return Boolean(alert.attendedById || alert.attendedBy?.id);
+  }
+
+  private getMarkerColor(code?: StateCode): string {
+    return getAlertStateStyle(code).markerColor;
+  }
+
+  getStateBadgeClass(code?: StateCode): string {
+    return getAlertStateStyle(code).badgeClass;
+  }
+
+  getDotClass(code?: StateCode): string {
+    return getAlertStateStyle(code).dotClass;
   }
 }
