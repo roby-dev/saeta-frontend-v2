@@ -192,7 +192,7 @@ interface MenuItem {
             <a
               [routerLink]="item.url"
               routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: item.url === '/dashboard' }"
+              [routerLinkActiveOptions]="{ paths: 'exact', queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ignored' }"
               (click)="onMenuItemClick()"
               class="group flex items-center px-4 py-2.5 text-sm font-medium transition-colors relative"
               [class.justify-center]="sidebarState() === 'mini'"

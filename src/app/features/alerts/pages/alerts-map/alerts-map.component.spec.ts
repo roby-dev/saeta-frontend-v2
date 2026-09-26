@@ -245,6 +245,49 @@ describe('AlertsMapComponent', () => {
     expect(component['selectedAlert']()?.id).toBe('alert-2');
   });
 
+  it('should select alert on marker click without opening the detail side sheet', () => {
+    flushInitRequests();
+
+    component['onMarkerClick'](mockAlerts[0]);
+
+    expect(component['selectedAlert']()?.id).toBe('alert-1');
+    expect(component['isDetailOpen']()).toBe(false);
+  });
+
+  it('should build a brief popup summary with a "Ver más" action that opens the side sheet', () => {
+    flushInitRequests();
+
+    const popup = component['buildPopupContent'](mockAlerts[0]);
+    expect(popup.textContent).toContain('Robo');
+    expect(popup.textContent).toContain('Pendiente');
+
+    const button = popup.querySelector('button');
+    expect(button?.textContent).toContain('Ver más');
+    button!.click();
+
+    expect(component['selectedAlert']()?.id).toBe('alert-1');
+    expect(component['isDetailOpen']()).toBe(true);
+  });
+
+  it('should map state names to side sheet badge classes', () => {
+    expect(component.getStateBadgeClass('Pendiente')).toContain('amber');
+    expect(component.getStateBadgeClass('En proceso')).toContain('sky');
+    expect(component.getStateBadgeClass('Resuelta')).toContain('emerald');
+    expect(component.getStateBadgeClass('Cancelada')).toContain('rose');
+    expect(component.getStateBadgeClass('Sin estado')).toContain('slate');
+  });
+
+  it('should close the detail side sheet and clear selection', () => {
+    flushInitRequests();
+
+    component.openDetail(mockAlerts[1]);
+    expect(component['isDetailOpen']()).toBe(true);
+
+    component.closeDetail();
+    expect(component['isDetailOpen']()).toBe(false);
+    expect(component['selectedAlert']()).toBeNull();
+  });
+
   it('should open delegate modal with process state preselected', () => {
     flushInitRequests();
 
