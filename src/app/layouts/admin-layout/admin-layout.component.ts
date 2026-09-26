@@ -6,7 +6,7 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service.js';
 
@@ -24,7 +24,7 @@ interface MenuItem {
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastContainerComponent],
+  imports: [RouterOutlet, RouterLink, ToastContainerComponent],
   template: `
     <div class="min-h-screen flex flex-col bg-[#f4f6f9] text-[#67757c] font-sans antialiased">
       <!-- Toast Container for Realtime Alerts -->
@@ -191,8 +191,7 @@ interface MenuItem {
           @for (item of filteredMenu(); track item.url) {
             <a
               [routerLink]="item.url"
-              routerLinkActive="active"
-              [routerLinkActiveOptions]="{ paths: 'exact', queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ignored' }"
+              [class.active]="isActive(item.url)"
               (click)="onMenuItemClick()"
               class="group flex items-center px-4 py-2.5 text-sm font-medium transition-colors relative"
               [class.justify-center]="sidebarState() === 'mini'"
@@ -368,6 +367,8 @@ export class AdminLayoutComponent implements OnInit {
 
   ngOnInit(): void {
     this.checkScreenSize();
+    // The initial NavigationEnd fires before this subscription on a full page reload
+    this.currentUrl.set(this.router.url);
 
     if (this.authService.isAuthenticated()) {
       this.authService.fetchProfile().subscribe({
@@ -447,9 +448,9 @@ export class AdminLayoutComponent implements OnInit {
   }
 
   isActive(url: string): boolean {
-    const current = this.currentUrl();
-    if (url === '/dashboard') return current === '/dashboard' || current === '/';
-    return current.startsWith(url);
+    const path = this.currentUrl().split(/[?#]/)[0];
+    if (url === '/dashboard') return path === '/dashboard' || path === '/';
+    return path === url;
   }
 
   logout(): void {
